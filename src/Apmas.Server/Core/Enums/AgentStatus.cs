@@ -1,7 +1,7 @@
 namespace Apmas.Server.Core.Enums;
 
 /// <summary>
-/// Represents the lifecycle state of an agent.
+/// Represents the lifecycle status of an agent.
 /// </summary>
 public enum AgentStatus
 {
