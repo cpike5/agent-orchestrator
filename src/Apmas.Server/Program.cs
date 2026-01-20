@@ -57,9 +57,12 @@ try
 
     // MCP tools
     builder.Services.AddMcpTool<CheckpointTool>();
+    builder.Services.AddMcpTool<CompleteTool>();
     builder.Services.AddMcpTool<GetContextTool>();
     builder.Services.AddMcpTool<HeartbeatTool>();
     builder.Services.AddMcpTool<ReportStatusTool>();
+    builder.Services.AddMcpTool<RequestHelpTool>();
+    builder.Services.AddMcpTool<SendMessageTool>();
 
     // TODO: Add hosted services (future issues)
     // builder.Services.AddHostedService<SupervisorService>();

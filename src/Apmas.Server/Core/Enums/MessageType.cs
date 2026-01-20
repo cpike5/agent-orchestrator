@@ -17,6 +17,12 @@ public enum MessageType
     /// <summary>Answer to a question.</summary>
     Answer,
 
+    /// <summary>Informational message.</summary>
+    Info,
+
+    /// <summary>Request for action or assistance.</summary>
+    Request,
+
     /// <summary>Heartbeat signal.</summary>
     Heartbeat,
 
