@@ -1,3 +1,5 @@
+using Apmas.Server.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
@@ -37,8 +39,10 @@ try
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 7));
 
-    // TODO: Add core services (Issue #3+)
-    // builder.Services.Configure<ApmasOptions>(builder.Configuration.GetSection("Apmas"));
+    // Configure APMAS options
+    builder.Services.Configure<ApmasOptions>(builder.Configuration.GetSection(ApmasOptions.SectionName));
+
+    // TODO: Add core services (Issue #4+)
     // builder.Services.AddSingleton<IAgentStateManager, AgentStateManager>();
     // builder.Services.AddSingleton<IMessageBus, MessageBus>();
     // builder.Services.AddHostedService<SupervisorService>();
