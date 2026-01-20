@@ -1,5 +1,6 @@
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
+using Apmas.Server.Mcp;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -49,6 +50,9 @@ try
 
     // Core services
     builder.Services.AddCoreServices();
+
+    // MCP server
+    builder.Services.AddMcpServer();
 
     // TODO: Add hosted services (future issues)
     // builder.Services.AddHostedService<SupervisorService>();
