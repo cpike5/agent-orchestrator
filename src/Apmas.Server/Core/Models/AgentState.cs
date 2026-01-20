@@ -5,75 +5,75 @@ namespace Apmas.Server.Core.Models;
 /// <summary>
 /// Represents the state of an individual agent.
 /// </summary>
-public record AgentState
+public class AgentState
 {
     /// <summary>
-    /// Unique identifier for the agent state record.
+    /// Primary key for EF Core.
     /// </summary>
-    public int Id { get; init; }
+    public int Id { get; set; }
 
     /// <summary>
-    /// Unique role name for the agent (e.g., "architect", "developer").
+    /// Role identifier for this agent (e.g., "architect", "developer").
     /// </summary>
-    public required string Role { get; init; }
+    public required string Role { get; set; }
 
     /// <summary>
     /// Current status of the agent.
     /// </summary>
-    public required AgentStatus Status { get; init; }
+    public AgentStatus Status { get; set; } = AgentStatus.Pending;
 
     /// <summary>
-    /// The Claude Code subagent type to use.
+    /// Subagent type to use when spawning (e.g., "systems-architect").
     /// </summary>
-    public required string SubagentType { get; init; }
+    public required string SubagentType { get; set; }
 
     /// <summary>
     /// When the agent was spawned.
     /// </summary>
-    public DateTime? SpawnedAt { get; init; }
+    public DateTime? SpawnedAt { get; set; }
 
     /// <summary>
-    /// When the agent completed its task.
+    /// When the agent completed.
     /// </summary>
-    public DateTime? CompletedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
 
     /// <summary>
-    /// When the agent will timeout if no heartbeat received.
+    /// When the agent will timeout.
     /// </summary>
-    public DateTime? TimeoutAt { get; init; }
+    public DateTime? TimeoutAt { get; set; }
 
     /// <summary>
-    /// Optional task/process ID for the running agent.
+    /// Task ID from the agent spawner.
     /// </summary>
-    public string? TaskId { get; init; }
+    public string? TaskId { get; set; }
 
     /// <summary>
-    /// Number of times the agent has been restarted.
+    /// Number of times this agent has been retried.
     /// </summary>
-    public int RetryCount { get; init; }
+    public int RetryCount { get; set; }
 
     /// <summary>
-    /// List of artifact file paths created by the agent.
+    /// JSON-serialized list of artifact file paths.
     /// </summary>
-    public IReadOnlyList<string> Artifacts { get; init; } = Array.Empty<string>();
+    public string? ArtifactsJson { get; set; }
 
     /// <summary>
-    /// List of agent roles this agent depends on.
+    /// JSON-serialized list of dependency role names.
     /// </summary>
-    public IReadOnlyList<string> Dependencies { get; init; } = Array.Empty<string>();
+    public string? DependenciesJson { get; set; }
 
     /// <summary>
     /// Last status message from the agent.
     /// </summary>
-    public string? LastMessage { get; init; }
+    public string? LastMessage { get; set; }
 
     /// <summary>
     /// Last error message from the agent.
     /// </summary>
-    public string? LastError { get; init; }
+    public string? LastError { get; set; }
 
     /// <summary>
-    /// Estimated context token usage (if known).
+    /// Estimated context usage in tokens.
     /// </summary>
-    public int? EstimatedContextUsage { get; init; }
+    public int? EstimatedContextUsage { get; set; }
 }

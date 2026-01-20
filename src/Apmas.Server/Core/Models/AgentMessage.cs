@@ -3,47 +3,47 @@ using Apmas.Server.Core.Enums;
 namespace Apmas.Server.Core.Models;
 
 /// <summary>
-/// Represents a message exchanged between agents and the supervisor.
+/// Represents a message between agents or to the supervisor.
 /// </summary>
-public record AgentMessage
+public class AgentMessage
 {
     /// <summary>
-    /// Unique identifier for the message.
+    /// Unique identifier for this message.
     /// </summary>
-    public required string Id { get; init; }
+    public required string Id { get; set; }
 
     /// <summary>
-    /// When the message was created.
+    /// When the message was sent.
     /// </summary>
-    public required DateTime Timestamp { get; init; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Role of the agent that sent the message.
+    /// Role of the sending agent.
     /// </summary>
-    public required string From { get; init; }
+    public required string From { get; set; }
 
     /// <summary>
-    /// Role of the target agent, or "supervisor" or "all".
+    /// Role of the receiving agent, or "supervisor" or "all".
     /// </summary>
-    public required string To { get; init; }
+    public required string To { get; set; }
 
     /// <summary>
     /// Type of message.
     /// </summary>
-    public required MessageType Type { get; init; }
+    public MessageType Type { get; set; }
 
     /// <summary>
     /// Message content.
     /// </summary>
-    public required string Content { get; init; }
+    public required string Content { get; set; }
 
     /// <summary>
-    /// Optional list of artifact file paths related to this message.
+    /// JSON-serialized list of artifact file paths.
     /// </summary>
-    public IReadOnlyList<string>? Artifacts { get; init; }
+    public string? ArtifactsJson { get; set; }
 
     /// <summary>
-    /// Optional metadata dictionary for additional context.
+    /// JSON-serialized metadata dictionary.
     /// </summary>
-    public IReadOnlyDictionary<string, object>? Metadata { get; init; }
+    public string? MetadataJson { get; set; }
 }

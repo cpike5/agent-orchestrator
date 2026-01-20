@@ -1,23 +1,23 @@
 namespace Apmas.Server.Core.Enums;
 
 /// <summary>
-/// Types of messages exchanged between agents and the supervisor.
+/// Types of messages exchanged between agents.
 /// </summary>
 public enum MessageType
 {
-    /// <summary>Task assignment from supervisor to agent.</summary>
+    /// <summary>Task assignment to an agent.</summary>
     Assignment,
 
-    /// <summary>Progress update from agent.</summary>
+    /// <summary>Progress update.</summary>
     Progress,
 
-    /// <summary>Question from one agent to another or to human.</summary>
+    /// <summary>Question from one agent to another.</summary>
     Question,
 
     /// <summary>Answer to a question.</summary>
     Answer,
 
-    /// <summary>Periodic heartbeat signal.</summary>
+    /// <summary>Heartbeat signal.</summary>
     Heartbeat,
 
     /// <summary>Checkpoint save notification.</summary>
@@ -26,21 +26,21 @@ public enum MessageType
     /// <summary>Task completion notification.</summary>
     Done,
 
-    /// <summary>Agent requesting review of their work.</summary>
+    /// <summary>Request for review.</summary>
     NeedsReview,
 
-    /// <summary>Work approved by reviewer.</summary>
+    /// <summary>Review approved.</summary>
     Approved,
 
-    /// <summary>Reviewer requested changes.</summary>
+    /// <summary>Review requested changes.</summary>
     ChangesRequested,
 
-    /// <summary>Agent is blocked and needs help.</summary>
+    /// <summary>Agent is blocked.</summary>
     Blocked,
 
-    /// <summary>Agent approaching or hit context limits.</summary>
+    /// <summary>Agent approaching context limit.</summary>
     ContextLimit,
 
-    /// <summary>Error notification.</summary>
+    /// <summary>Error occurred.</summary>
     Error
 }
