@@ -1,6 +1,7 @@
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Apmas.Server.Mcp;
+using Apmas.Server.Mcp.Tools;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -53,6 +54,12 @@ try
 
     // MCP server
     builder.Services.AddMcpServer();
+
+    // MCP tools
+    builder.Services.AddMcpTool<CheckpointTool>();
+    builder.Services.AddMcpTool<GetContextTool>();
+    builder.Services.AddMcpTool<HeartbeatTool>();
+    builder.Services.AddMcpTool<ReportStatusTool>();
 
     // TODO: Add hosted services (future issues)
     // builder.Services.AddHostedService<SupervisorService>();
