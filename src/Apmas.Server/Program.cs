@@ -1,6 +1,9 @@
 using Apmas.Server.Configuration;
+using Apmas.Server.Storage;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
 
@@ -42,12 +45,35 @@ try
     // Configure APMAS options
     builder.Services.Configure<ApmasOptions>(builder.Configuration.GetSection(ApmasOptions.SectionName));
 
-    // TODO: Add core services (Issue #4+)
+    // Configure EF Core with SQLite
+    builder.Services.AddDbContext<ApmasDbContext>((serviceProvider, options) =>
+    {
+        var apmasOptions = serviceProvider.GetRequiredService<IOptions<ApmasOptions>>().Value;
+        var dataDirectory = apmasOptions.GetDataDirectoryPath();
+
+        // Ensure data directory exists
+        Directory.CreateDirectory(dataDirectory);
+
+        var dbPath = Path.Combine(dataDirectory, "state.db");
+        options.UseSqlite($"Data Source={dbPath}");
+    });
+
+    // TODO: Add core services (future issues)
     // builder.Services.AddSingleton<IAgentStateManager, AgentStateManager>();
     // builder.Services.AddSingleton<IMessageBus, MessageBus>();
     // builder.Services.AddHostedService<SupervisorService>();
 
     var host = builder.Build();
+
+    // Initialize database
+    using (var scope = host.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApmasDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+        Log.Information("Database initialized at {DatabasePath}",
+            dbContext.Database.GetDbConnection().DataSource);
+    }
+
     await host.RunAsync();
 }
 catch (Exception ex)
