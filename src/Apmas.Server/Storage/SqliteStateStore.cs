@@ -144,7 +144,7 @@ public class SqliteStateStore : IStateStore
 
         if (role != null)
         {
-            query = query.Where(m => m.From == role || m.To == role);
+            query = query.Where(m => m.From == role || m.To == role || m.To == "all");
         }
 
         if (since != null)

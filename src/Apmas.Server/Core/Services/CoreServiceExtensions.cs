@@ -14,6 +14,7 @@ public static class CoreServiceExtensions
     {
         services.AddMemoryCache();
         services.AddSingleton<IAgentStateManager, AgentStateManager>();
+        services.AddSingleton<IMessageBus, MessageBus>();
         return services;
     }
 }

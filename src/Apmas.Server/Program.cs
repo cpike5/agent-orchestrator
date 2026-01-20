@@ -1,4 +1,5 @@
 using Apmas.Server.Configuration;
+using Apmas.Server.Core.Services;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -46,9 +47,10 @@ try
     // Storage
     builder.Services.AddSqliteStateStore();
 
-    // TODO: Add core services (future issues)
-    // builder.Services.AddSingleton<IAgentStateManager, AgentStateManager>();
-    // builder.Services.AddSingleton<IMessageBus, MessageBus>();
+    // Core services
+    builder.Services.AddCoreServices();
+
+    // TODO: Add hosted services (future issues)
     // builder.Services.AddHostedService<SupervisorService>();
 
     var host = builder.Build();
