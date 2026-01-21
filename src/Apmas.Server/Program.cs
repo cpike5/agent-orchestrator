@@ -54,7 +54,8 @@ try
     // Core services
     builder.Services.AddCoreServices();
 
-    // Agent spawner
+    // Agent roster and spawner
+    builder.Services.AddAgentRoster();
     builder.Services.AddAgentSpawner();
 
     // MCP server
