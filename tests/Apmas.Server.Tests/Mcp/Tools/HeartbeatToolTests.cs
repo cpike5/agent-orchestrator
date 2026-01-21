@@ -16,6 +16,7 @@ public class HeartbeatToolTests : IDisposable
     private readonly IDbContextFactory<ApmasDbContext> _contextFactory;
     private readonly SqliteStateStore _stateStore;
     private readonly AgentStateManager _agentStateManager;
+    private readonly FakeHeartbeatMonitor _heartbeatMonitor;
     private readonly HeartbeatTool _tool;
     private readonly IMemoryCache _cache;
 
@@ -29,7 +30,8 @@ public class HeartbeatToolTests : IDisposable
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
         _cache = new MemoryCache(new MemoryCacheOptions());
         _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
-        _tool = new HeartbeatTool(_agentStateManager, NullLogger<HeartbeatTool>.Instance);
+        _heartbeatMonitor = new FakeHeartbeatMonitor();
+        _tool = new HeartbeatTool(_agentStateManager, _heartbeatMonitor, NullLogger<HeartbeatTool>.Instance);
 
         // Ensure database is created
         using var context = _contextFactory.CreateDbContext();
@@ -266,6 +268,69 @@ public class HeartbeatToolTests : IDisposable
         Assert.Contains("Progress: Reviewing database schema", message);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldRecordHeartbeatInMonitor()
+    {
+        // Arrange
+        var agent = new AgentState
+        {
+            Role = "architect",
+            SubagentType = "systems-architect",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
+        var input = JsonDocument.Parse("""
+        {
+            "agentRole": "architect",
+            "status": "working",
+            "progress": "Designing system architecture"
+        }
+        """).RootElement;
+
+        // Act
+        var result = await _tool.ExecuteAsync(input, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        Assert.Single(_heartbeatMonitor.RecordedHeartbeats);
+        var heartbeat = _heartbeatMonitor.RecordedHeartbeats[0];
+        Assert.Equal("architect", heartbeat.AgentRole);
+        Assert.Equal("working", heartbeat.Status);
+        Assert.Equal("Designing system architecture", heartbeat.Progress);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutProgress_ShouldRecordHeartbeatWithNullProgress()
+    {
+        // Arrange
+        var agent = new AgentState
+        {
+            Role = "developer",
+            SubagentType = "backend-developer",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
+        var input = JsonDocument.Parse("""
+        {
+            "agentRole": "developer",
+            "status": "thinking"
+        }
+        """).RootElement;
+
+        // Act
+        var result = await _tool.ExecuteAsync(input, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        Assert.Single(_heartbeatMonitor.RecordedHeartbeats);
+        var heartbeat = _heartbeatMonitor.RecordedHeartbeats[0];
+        Assert.Equal("developer", heartbeat.AgentRole);
+        Assert.Equal("thinking", heartbeat.Status);
+        Assert.Null(heartbeat.Progress);
+    }
+
     private class TestDbContextFactory : IDbContextFactory<ApmasDbContext>
     {
         private readonly DbContextOptions<ApmasDbContext> _options;
@@ -279,5 +344,23 @@ public class HeartbeatToolTests : IDisposable
         {
             return new ApmasDbContext(_options);
         }
+    }
+
+    private class FakeHeartbeatMonitor : IHeartbeatMonitor
+    {
+        public List<HeartbeatRecord> RecordedHeartbeats { get; } = new();
+
+        public void RecordHeartbeat(string agentRole, string status, string? progress)
+        {
+            RecordedHeartbeats.Add(new HeartbeatRecord(agentRole, status, progress));
+        }
+
+        public bool IsAgentHealthy(string agentRole) => true;
+
+        public IReadOnlyList<string> GetUnhealthyAgents() => new List<string>();
+
+        public void ClearAgent(string agentRole) { }
+
+        public record HeartbeatRecord(string AgentRole, string Status, string? Progress);
     }
 }

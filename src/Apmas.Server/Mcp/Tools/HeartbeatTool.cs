@@ -12,11 +12,16 @@ namespace Apmas.Server.Mcp.Tools;
 public class HeartbeatTool : IMcpTool
 {
     private readonly IAgentStateManager _agentStateManager;
+    private readonly IHeartbeatMonitor _heartbeatMonitor;
     private readonly ILogger<HeartbeatTool> _logger;
 
-    public HeartbeatTool(IAgentStateManager agentStateManager, ILogger<HeartbeatTool> logger)
+    public HeartbeatTool(
+        IAgentStateManager agentStateManager,
+        IHeartbeatMonitor heartbeatMonitor,
+        ILogger<HeartbeatTool> logger)
     {
         _agentStateManager = agentStateManager;
+        _heartbeatMonitor = heartbeatMonitor;
         _logger = logger;
     }
 
@@ -119,6 +124,9 @@ public class HeartbeatTool : IMcpTool
 
                 return state;
             });
+
+            // Record heartbeat in the monitor
+            _heartbeatMonitor.RecordHeartbeat(agentRole, status, progress);
 
             _logger.LogInformation("Heartbeat from {AgentRole}: {Status}", agentRole, status);
 
