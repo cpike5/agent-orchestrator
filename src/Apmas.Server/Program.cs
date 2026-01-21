@@ -1,3 +1,4 @@
+using Apmas.Server.Agents;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Apmas.Server.Mcp;
@@ -52,6 +53,9 @@ try
 
     // Core services
     builder.Services.AddCoreServices();
+
+    // Agent spawner
+    builder.Services.AddAgentSpawner();
 
     // MCP server
     builder.Services.AddMcpServer();

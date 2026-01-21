@@ -197,25 +197,45 @@ public class SupervisorService : BackgroundService
                     agentState.SubagentType);
 
                 // Spawn the agent
-                var taskId = await _agentSpawner.SpawnAgentAsync(
+                var spawnResult = await _agentSpawner.SpawnAgentAsync(
                     agentState.Role,
                     agentState.SubagentType,
                     checkpointContext: null);
+
+                // Check if spawn was successful
+                if (!spawnResult.Success)
+                {
+                    _logger.LogError(
+                        "Failed to spawn agent {AgentRole}: {ErrorMessage}",
+                        agentState.Role,
+                        spawnResult.ErrorMessage);
+
+                    await _stateManager.UpdateAgentStateAsync(agentState.Role, a =>
+                    {
+                        a.Status = AgentStatus.Failed;
+                        a.LastError = spawnResult.ErrorMessage;
+                        a.RetryCount++;
+                        return a;
+                    });
+
+                    continue;
+                }
 
                 // Update status to Running with spawn timestamp
                 await _stateManager.UpdateAgentStateAsync(agentState.Role, a =>
                 {
                     a.Status = AgentStatus.Running;
-                    a.TaskId = taskId;
+                    a.TaskId = spawnResult.TaskId;
                     a.SpawnedAt = DateTime.UtcNow;
                     a.TimeoutAt = DateTime.UtcNow.Add(_options.Timeouts.GetTimeoutFor(agentState.Role));
                     return a;
                 });
 
                 _logger.LogInformation(
-                    "Agent {AgentRole} spawned successfully with task ID {TaskId}",
+                    "Agent {AgentRole} spawned successfully with task ID {TaskId} and PID {ProcessId}",
                     agentState.Role,
-                    taskId);
+                    spawnResult.TaskId,
+                    spawnResult.ProcessId);
             }
             catch (Exception ex)
             {
