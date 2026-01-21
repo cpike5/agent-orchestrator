@@ -20,6 +20,9 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Seq" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="OpenTelemetry" Version="1.11.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.11.*" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.*" />
   </ItemGroup>
 
 </Project>

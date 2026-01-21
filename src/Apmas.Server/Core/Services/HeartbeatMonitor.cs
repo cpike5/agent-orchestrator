@@ -13,6 +13,7 @@ public class HeartbeatMonitor : IHeartbeatMonitor
 {
     private readonly ConcurrentDictionary<string, HeartbeatInfo> _heartbeats = new();
     private readonly IAgentStateManager _agentStateManager;
+    private readonly IApmasMetrics _metrics;
     private readonly ILogger<HeartbeatMonitor> _logger;
     private readonly ApmasOptions _options;
 
@@ -26,10 +27,12 @@ public class HeartbeatMonitor : IHeartbeatMonitor
 
     public HeartbeatMonitor(
         IAgentStateManager agentStateManager,
+        IApmasMetrics metrics,
         ILogger<HeartbeatMonitor> logger,
         IOptions<ApmasOptions> options)
     {
         _agentStateManager = agentStateManager;
+        _metrics = metrics;
         _logger = logger;
         _options = options.Value;
     }
@@ -41,7 +44,15 @@ public class HeartbeatMonitor : IHeartbeatMonitor
         if (string.IsNullOrWhiteSpace(status))
             throw new ArgumentException("Status cannot be null or empty", nameof(status));
 
-        var heartbeatInfo = new HeartbeatInfo(DateTime.UtcNow, status, progress);
+        var now = DateTime.UtcNow;
+        var heartbeatInfo = new HeartbeatInfo(now, status, progress);
+
+        // Calculate interval if this agent has a previous heartbeat
+        if (_heartbeats.TryGetValue(agentRole, out var previousHeartbeat))
+        {
+            var intervalSeconds = (now - previousHeartbeat.Timestamp).TotalSeconds;
+            _metrics.RecordHeartbeatInterval(intervalSeconds);
+        }
 
         _heartbeats.AddOrUpdate(
             agentRole,

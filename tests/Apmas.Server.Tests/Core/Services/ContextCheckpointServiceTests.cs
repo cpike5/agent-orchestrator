@@ -21,7 +21,8 @@ public class ContextCheckpointServiceTests : IDisposable
 
         _contextFactory = new TestDbContextFactory(options);
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
-        _service = new ContextCheckpointService(_stateStore, NullLogger<ContextCheckpointService>.Instance);
+        var fakeMetrics = new FakeApmasMetrics();
+        _service = new ContextCheckpointService(_stateStore, fakeMetrics, NullLogger<ContextCheckpointService>.Instance);
 
         // Ensure database is created
         using var context = _contextFactory.CreateDbContext();
@@ -374,5 +375,19 @@ public class ContextCheckpointServiceTests : IDisposable
         {
             return new ApmasDbContext(_options);
         }
+    }
+
+    private class FakeApmasMetrics : IApmasMetrics
+    {
+        public void RecordAgentSpawned(string role) { }
+        public void RecordAgentCompleted(string role) { }
+        public void RecordAgentFailed(string role, string reason) { }
+        public void RecordAgentTimedOut(string role) { }
+        public void RecordMessageSent(string messageType) { }
+        public void RecordCheckpointSaved(string role) { }
+        public void RecordAgentDuration(string role, double durationSeconds) { }
+        public void RecordHeartbeatInterval(double intervalSeconds) { }
+        public Task UpdateCachedMetricsAsync() => Task.CompletedTask;
+        public void Dispose() { }
     }
 }

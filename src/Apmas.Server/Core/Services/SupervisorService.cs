@@ -17,6 +17,7 @@ public class SupervisorService : BackgroundService
     private readonly IMessageBus _messageBus;
     private readonly IHeartbeatMonitor _heartbeatMonitor;
     private readonly ITimeoutHandler _timeoutHandler;
+    private readonly IApmasMetrics _metrics;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
 
@@ -26,6 +27,7 @@ public class SupervisorService : BackgroundService
         IMessageBus messageBus,
         IHeartbeatMonitor heartbeatMonitor,
         ITimeoutHandler timeoutHandler,
+        IApmasMetrics metrics,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
     {
@@ -34,6 +36,7 @@ public class SupervisorService : BackgroundService
         _messageBus = messageBus;
         _heartbeatMonitor = heartbeatMonitor;
         _timeoutHandler = timeoutHandler;
+        _metrics = metrics;
         _logger = logger;
         _options = options.Value;
     }
@@ -96,7 +99,9 @@ public class SupervisorService : BackgroundService
     /// </summary>
     private async Task HandleUnhealthyAgentAsync(AgentState agent, CancellationToken cancellationToken)
     {
+        _metrics.RecordAgentTimedOut(agent.Role);
         await _timeoutHandler.HandleTimeoutAsync(agent.Role, cancellationToken);
+        await _metrics.UpdateCachedMetricsAsync();
     }
 
     /// <summary>
@@ -166,6 +171,8 @@ public class SupervisorService : BackgroundService
                         agentState.Role,
                         spawnResult.ErrorMessage);
 
+                    _metrics.RecordAgentFailed(agentState.Role, spawnResult.ErrorMessage ?? "Unknown spawn error");
+
                     await _stateManager.UpdateAgentStateAsync(agentState.Role, a =>
                     {
                         a.Status = AgentStatus.Failed;
@@ -173,6 +180,8 @@ public class SupervisorService : BackgroundService
                         a.RetryCount++;
                         return a;
                     });
+
+                    await _metrics.UpdateCachedMetricsAsync();
 
                     continue;
                 }
@@ -186,6 +195,9 @@ public class SupervisorService : BackgroundService
                     a.TimeoutAt = DateTime.UtcNow.Add(_options.Timeouts.GetTimeoutFor(agentState.Role));
                     return a;
                 });
+
+                _metrics.RecordAgentSpawned(agentState.Role);
+                await _metrics.UpdateCachedMetricsAsync();
 
                 _logger.LogInformation(
                     "Agent {AgentRole} spawned successfully with task ID {TaskId} and PID {ProcessId}",

@@ -5,6 +5,7 @@ using Apmas.Server.Mcp;
 using Apmas.Server.Mcp.Resources;
 using Apmas.Server.Mcp.Tools;
 using Apmas.Server.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -53,6 +54,13 @@ try
 
     // Core services
     builder.Services.AddCoreServices();
+
+    // Configure OpenTelemetry metrics export if enabled
+    var metricsOptions = builder.Configuration
+        .GetSection(ApmasOptions.SectionName)
+        .GetSection("Metrics")
+        .Get<MetricsOptions>() ?? new MetricsOptions();
+    builder.Services.AddApmasMetricsExport(metricsOptions);
 
     // Agent roster and spawner
     builder.Services.AddAgentRoster();

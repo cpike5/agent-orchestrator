@@ -12,14 +12,17 @@ namespace Apmas.Server.Core.Services;
 public class MessageBus : IMessageBus
 {
     private readonly IStateStore _store;
+    private readonly IApmasMetrics _metrics;
     private readonly ILogger<MessageBus> _logger;
     private readonly Channel<AgentMessage> _messageChannel;
 
     public MessageBus(
         IStateStore store,
+        IApmasMetrics metrics,
         ILogger<MessageBus> logger)
     {
         _store = store;
+        _metrics = metrics;
         _logger = logger;
 
         // Use unbounded channel for message broadcasting
@@ -43,6 +46,8 @@ public class MessageBus : IMessageBus
 
         // Persist the message first to guarantee delivery
         await _store.SaveMessageAsync(message);
+
+        _metrics.RecordMessageSent(message.Type.ToString());
 
         _logger.LogInformation("Published message {MessageId} from {From} to {To} (Type: {MessageType})",
             message.Id, message.From, message.To, message.Type);

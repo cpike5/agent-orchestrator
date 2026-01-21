@@ -12,13 +12,16 @@ namespace Apmas.Server.Core.Services;
 public class ContextCheckpointService : IContextCheckpointService
 {
     private readonly IStateStore _stateStore;
+    private readonly IApmasMetrics _metrics;
     private readonly ILogger<ContextCheckpointService> _logger;
 
     public ContextCheckpointService(
         IStateStore stateStore,
+        IApmasMetrics metrics,
         ILogger<ContextCheckpointService> logger)
     {
         _stateStore = stateStore;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -36,6 +39,8 @@ public class ContextCheckpointService : IContextCheckpointService
         }
 
         await _stateStore.SaveCheckpointAsync(checkpoint);
+
+        _metrics.RecordCheckpointSaved(agentRole);
 
         _logger.LogInformation(
             "Saved checkpoint for agent {AgentRole}: {Summary} ({PercentComplete:F0}% complete)",
