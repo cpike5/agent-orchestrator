@@ -97,6 +97,7 @@ Agents communicate with APMAS using these tools:
 ## Documentation
 
 - [Getting Started](docs/GETTING-STARTED.md) - Installation and first project
+- [Tutorial: Build a C# App](docs/TUTORIAL.md) - Step-by-step walkthrough
 - [Configuration Reference](docs/CONFIGURATION.md) - All configuration options
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [APMAS Specification](APMAS-SPEC.md) - Detailed technical specification

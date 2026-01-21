@@ -140,6 +140,7 @@ Agents communicate with APMAS using these MCP tools:
 
 ## Next Steps
 
+- [Tutorial: Build a C# App](TUTORIAL.md) - Complete walkthrough building an application
 - [Configuration Reference](CONFIGURATION.md) - Full configuration options
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
 - [APMAS Specification](../APMAS-SPEC.md) - Detailed technical specification
