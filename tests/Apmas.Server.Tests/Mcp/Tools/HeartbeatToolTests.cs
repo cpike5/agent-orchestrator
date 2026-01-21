@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Apmas.Server.Agents.Definitions;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
@@ -31,16 +32,34 @@ public class HeartbeatToolTests : IDisposable
         _contextFactory = new TestDbContextFactory(options);
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
         _cache = new MemoryCache(new MemoryCacheOptions());
-        _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
-        _heartbeatMonitor = new FakeHeartbeatMonitor();
 
-        var apmasOptions = Options.Create(new ApmasOptions
+        var apmasOptionsValue = new ApmasOptions
         {
+            ProjectName = "TestProject",
+            WorkingDirectory = "/test/project",
             Timeouts = new TimeoutOptions
             {
                 HeartbeatTimeoutMinutes = 10
+            },
+            Agents = new AgentOptions
+            {
+                Roster = new List<AgentDefinition>
+                {
+                    new() { Role = "test-agent", SubagentType = "general-purpose" }
+                }
             }
-        });
+        };
+        var apmasOptions = Options.Create(apmasOptionsValue);
+        var agentOptionsWrapper = Options.Create(apmasOptionsValue.Agents);
+        var roster = new AgentRoster(agentOptionsWrapper);
+
+        _agentStateManager = new AgentStateManager(
+            _stateStore,
+            NullLogger<AgentStateManager>.Instance,
+            _cache,
+            apmasOptions,
+            roster);
+        _heartbeatMonitor = new FakeHeartbeatMonitor();
 
         _tool = new HeartbeatTool(_agentStateManager, _heartbeatMonitor, NullLogger<HeartbeatTool>.Instance, apmasOptions);
 

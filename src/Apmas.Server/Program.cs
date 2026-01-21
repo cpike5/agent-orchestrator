@@ -83,13 +83,21 @@ try
     builder.Services.AddMcpResource<AgentMessagesResource>();
     builder.Services.AddMcpResource<CheckpointResource>();
 
-    // TODO: Add hosted services (future issues)
-    // builder.Services.AddHostedService<SupervisorService>();
+    // Supervisor service for agent lifecycle management
+    builder.Services.AddHostedService<SupervisorService>();
 
     var host = builder.Build();
 
     // Ensure database is created
     await host.Services.EnsureStorageCreatedAsync();
+
+    // Initialize project and agents from configuration if not already done
+    var stateManager = host.Services.GetRequiredService<IAgentStateManager>();
+    var initialized = await stateManager.InitializeFromConfigAsync();
+    if (initialized)
+    {
+        Log.Information("Project and agents initialized from configuration");
+    }
 
     // Validate dependency graph at startup
     var dependencyResolver = host.Services.GetRequiredService<IDependencyResolver>();

@@ -1,9 +1,12 @@
 using System.Text.Json;
+using Apmas.Server.Agents.Definitions;
+using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Apmas.Server.Core.Services;
 
@@ -15,6 +18,8 @@ public class AgentStateManager : IAgentStateManager
     private readonly IStateStore _stateStore;
     private readonly ILogger<AgentStateManager> _logger;
     private readonly IMemoryCache _cache;
+    private readonly ApmasOptions _options;
+    private readonly AgentRoster _roster;
 
     private const string ProjectStateCacheKey = "project-state";
     private const string AllAgentsCacheKey = "all-agents";
@@ -23,11 +28,15 @@ public class AgentStateManager : IAgentStateManager
     public AgentStateManager(
         IStateStore stateStore,
         ILogger<AgentStateManager> logger,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IOptions<ApmasOptions> options,
+        AgentRoster roster)
     {
         _stateStore = stateStore;
         _logger = logger;
         _cache = cache;
+        _options = options.Value;
+        _roster = roster;
     }
 
     public async Task<ProjectState> GetProjectStateAsync()
@@ -175,6 +184,46 @@ public class AgentStateManager : IAgentStateManager
 
         _logger.LogInformation("Initialized project {ProjectName} at {WorkingDirectory}",
             name, workingDirectory);
+    }
+
+    public async Task<bool> InitializeFromConfigAsync()
+    {
+        // Check if project already exists
+        var existingProject = await _stateStore.GetProjectStateAsync();
+        if (existingProject != null)
+        {
+            _logger.LogInformation("Project {ProjectName} already initialized, skipping initialization",
+                existingProject.Name);
+            return false;
+        }
+
+        _logger.LogInformation("Initializing project {ProjectName} from configuration",
+            _options.ProjectName);
+
+        // Create project state
+        await InitializeProjectAsync(_options.ProjectName, _options.WorkingDirectory);
+
+        // Create agent states from roster
+        foreach (var agentDef in _roster.Agents)
+        {
+            var agentState = new AgentState
+            {
+                Role = agentDef.Role,
+                SubagentType = agentDef.SubagentType,
+                Status = AgentStatus.Pending,
+                DependenciesJson = JsonSerializer.Serialize(agentDef.Dependencies)
+            };
+
+            await _stateStore.SaveAgentStateAsync(agentState);
+            _logger.LogDebug("Created agent state for {Role} with dependencies {Dependencies}",
+                agentDef.Role, agentDef.Dependencies);
+        }
+
+        // Invalidate cache
+        _cache.Remove(AllAgentsCacheKey);
+
+        _logger.LogInformation("Initialized {Count} agents from roster", _roster.Agents.Count);
+        return true;
     }
 
     private async Task<IReadOnlyList<AgentState>> GetAllAgentsAsync()

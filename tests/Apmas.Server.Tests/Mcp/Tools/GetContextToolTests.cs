@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Apmas.Server.Agents.Definitions;
+using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Core.Services;
@@ -7,6 +9,7 @@ using Apmas.Server.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Apmas.Server.Tests.Mcp.Tools;
 
@@ -28,7 +31,29 @@ public class GetContextToolTests : IDisposable
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
 
         var cache = new MemoryCache(new MemoryCacheOptions());
-        _stateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, cache);
+
+        var apmasOptions = new ApmasOptions
+        {
+            ProjectName = "TestProject",
+            WorkingDirectory = "/test/project",
+            Agents = new AgentOptions
+            {
+                Roster = new List<AgentDefinition>
+                {
+                    new() { Role = "test-agent", SubagentType = "general-purpose" }
+                }
+            }
+        };
+        var optionsWrapper = Options.Create(apmasOptions);
+        var agentOptionsWrapper = Options.Create(apmasOptions.Agents);
+        var roster = new AgentRoster(agentOptionsWrapper);
+
+        _stateManager = new AgentStateManager(
+            _stateStore,
+            NullLogger<AgentStateManager>.Instance,
+            cache,
+            optionsWrapper,
+            roster);
         var fakeMetrics = new FakeApmasMetrics();
         _messageBus = new MessageBus(_stateStore, fakeMetrics, NullLogger<MessageBus>.Instance);
 

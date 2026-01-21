@@ -48,4 +48,11 @@ public interface IAgentStateManager
     /// <param name="name">The name of the project.</param>
     /// <param name="workingDirectory">The working directory for the project.</param>
     Task InitializeProjectAsync(string name, string workingDirectory);
+
+    /// <summary>
+    /// Initializes project and agents from configuration if not already initialized.
+    /// Creates the project state and agent states in Pending status from the roster.
+    /// </summary>
+    /// <returns>True if initialization was performed, false if project already existed.</returns>
+    Task<bool> InitializeFromConfigAsync();
 }

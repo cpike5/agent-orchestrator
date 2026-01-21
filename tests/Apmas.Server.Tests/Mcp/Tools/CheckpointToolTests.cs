@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Apmas.Server.Agents.Definitions;
+using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Core.Services;
@@ -7,6 +9,7 @@ using Apmas.Server.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Apmas.Server.Tests.Mcp.Tools;
 
@@ -27,7 +30,29 @@ public class CheckpointToolTests : IDisposable
         _contextFactory = new TestDbContextFactory(options);
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
         _cache = new MemoryCache(new MemoryCacheOptions());
-        _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
+
+        var apmasOptions = new ApmasOptions
+        {
+            ProjectName = "TestProject",
+            WorkingDirectory = "/test/project",
+            Agents = new AgentOptions
+            {
+                Roster = new List<AgentDefinition>
+                {
+                    new() { Role = "test-agent", SubagentType = "general-purpose" }
+                }
+            }
+        };
+        var optionsWrapper = Options.Create(apmasOptions);
+        var agentOptionsWrapper = Options.Create(apmasOptions.Agents);
+        var roster = new AgentRoster(agentOptionsWrapper);
+
+        _agentStateManager = new AgentStateManager(
+            _stateStore,
+            NullLogger<AgentStateManager>.Instance,
+            _cache,
+            optionsWrapper,
+            roster);
         _tool = new CheckpointTool(_agentStateManager, _stateStore, NullLogger<CheckpointTool>.Instance);
 
         // Ensure database is created

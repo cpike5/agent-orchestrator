@@ -1,3 +1,4 @@
+using Apmas.Server.Agents.Definitions;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
@@ -30,19 +31,36 @@ public class TimeoutHandlerTests : IDisposable
         _contextFactory = new TestDbContextFactory(options);
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
         _cache = new MemoryCache(new MemoryCacheOptions());
-        _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
-        _messageBus = new FakeMessageBus();
 
         _apmasOptions = new ApmasOptions
         {
+            ProjectName = "TestProject",
+            WorkingDirectory = "/test/project",
             Timeouts = new TimeoutOptions
             {
                 MaxRetries = 3,
                 HeartbeatTimeoutMinutes = 10
+            },
+            Agents = new AgentOptions
+            {
+                Roster = new List<AgentDefinition>
+                {
+                    new() { Role = "test-agent", SubagentType = "general-purpose" }
+                }
             }
         };
 
         var optionsWrapper = Options.Create(_apmasOptions);
+        var agentOptionsWrapper = Options.Create(_apmasOptions.Agents);
+        var roster = new AgentRoster(agentOptionsWrapper);
+
+        _agentStateManager = new AgentStateManager(
+            _stateStore,
+            NullLogger<AgentStateManager>.Instance,
+            _cache,
+            optionsWrapper,
+            roster);
+        _messageBus = new FakeMessageBus();
 
         _handler = new TimeoutHandler(
             _agentStateManager,
