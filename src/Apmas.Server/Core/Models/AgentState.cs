@@ -76,4 +76,9 @@ public class AgentState
     /// Estimated context usage in tokens.
     /// </summary>
     public int? EstimatedContextUsage { get; set; }
+
+    /// <summary>
+    /// Timestamp of the last heartbeat received from this agent.
+    /// </summary>
+    public DateTime? LastHeartbeat { get; set; }
 }

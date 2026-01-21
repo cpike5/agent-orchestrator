@@ -27,6 +27,11 @@ public class TimeoutOptions
     public int MaxRetries { get; set; } = 3;
 
     /// <summary>
+    /// Supervisor polling interval in seconds.
+    /// </summary>
+    public int PollingIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
     /// Per-agent timeout overrides in minutes.
     /// Key is the agent role name.
     /// </summary>
