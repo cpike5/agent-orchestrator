@@ -39,6 +39,11 @@ public class ApmasOptions
     public SpawnerOptions Spawner { get; set; } = new();
 
     /// <summary>
+    /// Task decomposition configuration.
+    /// </summary>
+    public DecompositionOptions Decomposition { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>
