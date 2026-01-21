@@ -17,6 +17,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<IAgentStateManager, AgentStateManager>();
         services.AddSingleton<IDependencyResolver, DependencyResolver>();
         services.AddSingleton<IMessageBus, MessageBus>();
+        services.AddSingleton<IHeartbeatMonitor, HeartbeatMonitor>();
         services.AddHostedService<SupervisorService>();
         return services;
     }

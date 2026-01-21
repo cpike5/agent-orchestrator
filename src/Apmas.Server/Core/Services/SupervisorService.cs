@@ -15,6 +15,7 @@ public class SupervisorService : BackgroundService
     private readonly IAgentStateManager _stateManager;
     private readonly IAgentSpawner _agentSpawner;
     private readonly IMessageBus _messageBus;
+    private readonly IHeartbeatMonitor _heartbeatMonitor;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
 
@@ -22,12 +23,14 @@ public class SupervisorService : BackgroundService
         IAgentStateManager stateManager,
         IAgentSpawner agentSpawner,
         IMessageBus messageBus,
+        IHeartbeatMonitor heartbeatMonitor,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
     {
         _stateManager = stateManager;
         _agentSpawner = agentSpawner;
         _messageBus = messageBus;
+        _heartbeatMonitor = heartbeatMonitor;
         _logger = logger;
         _options = options.Value;
     }
@@ -71,46 +74,17 @@ public class SupervisorService : BackgroundService
     /// </summary>
     private async Task CheckAgentHealthAsync(CancellationToken cancellationToken)
     {
-        var activeAgents = await _stateManager.GetActiveAgentsAsync();
-        var now = DateTime.UtcNow;
-        var heartbeatTimeout = _options.Timeouts.HeartbeatTimeout;
+        var unhealthyAgentRoles = _heartbeatMonitor.GetUnhealthyAgents();
 
-        foreach (var agent in activeAgents)
+        foreach (var agentRole in unhealthyAgentRoles)
         {
-            // Skip agents that haven't spawned yet
-            if (agent.Status != AgentStatus.Running)
-            {
-                continue;
-            }
+            var agent = await _stateManager.GetAgentStateAsync(agentRole);
 
-            // If no heartbeat has been received yet, use SpawnedAt as the baseline
-            var lastHeartbeat = agent.LastHeartbeat ?? agent.SpawnedAt;
+            _logger.LogWarning(
+                "Agent {AgentRole} has not sent heartbeat within timeout threshold",
+                agentRole);
 
-            if (lastHeartbeat == null)
-            {
-                _logger.LogWarning("Agent {AgentRole} is running but has no heartbeat or spawn timestamp", agent.Role);
-                continue;
-            }
-
-            var timeSinceHeartbeat = now - lastHeartbeat.Value;
-
-            if (timeSinceHeartbeat > heartbeatTimeout)
-            {
-                _logger.LogWarning(
-                    "Agent {AgentRole} has not sent heartbeat in {ElapsedMinutes:F1} minutes (timeout: {TimeoutMinutes} minutes)",
-                    agent.Role,
-                    timeSinceHeartbeat.TotalMinutes,
-                    heartbeatTimeout.TotalMinutes);
-
-                await HandleUnhealthyAgentAsync(agent, cancellationToken);
-            }
-            else
-            {
-                _logger.LogDebug(
-                    "Agent {AgentRole} is healthy (last heartbeat {ElapsedSeconds:F0} seconds ago)",
-                    agent.Role,
-                    timeSinceHeartbeat.TotalSeconds);
-            }
+            await HandleUnhealthyAgentAsync(agent, cancellationToken);
         }
     }
 
