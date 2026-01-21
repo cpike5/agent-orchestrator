@@ -34,6 +34,11 @@ public class ApmasOptions
     public AgentOptions Agents { get; set; } = new();
 
     /// <summary>
+    /// Agent spawner configuration.
+    /// </summary>
+    public SpawnerOptions Spawner { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>
