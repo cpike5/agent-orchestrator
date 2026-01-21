@@ -20,12 +20,20 @@ public abstract class BaseAgentPrompt
 
     /// <summary>
     /// Generates the complete prompt for the agent.
+    /// This method is called by the AgentSpawner when launching an agent.
+    /// The generated prompt includes all APMAS communication instructions
+    /// and can be augmented with additional context (e.g., checkpoint data
+    /// for agent restart scenarios).
     /// </summary>
     /// <param name="project">The current project state.</param>
-    /// <param name="additionalContext">Optional additional context to inject into the prompt.</param>
+    /// <param name="additionalContext">Optional additional context to inject into the prompt.
+    /// Empty or whitespace-only strings are treated as no context.</param>
     /// <returns>The complete prompt string.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="project"/> is null.</exception>
     public string Generate(ProjectState project, string? additionalContext = null)
     {
+        ArgumentNullException.ThrowIfNull(project);
+
         var additionalSection = string.IsNullOrWhiteSpace(additionalContext)
             ? string.Empty
             : $"""
