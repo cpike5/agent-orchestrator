@@ -1,5 +1,6 @@
 using Apmas.Server.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -27,6 +28,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
         services.AddSingleton<IApmasMetrics, ApmasMetrics>();
         services.AddNotificationServices();
+        services.AddApmasHealthChecks();
         services.AddHostedService<SupervisorService>();
         return services;
     }
@@ -55,6 +57,20 @@ public static class CoreServiceExtensions
                 _ => sp.GetRequiredService<ConsoleNotificationService>()
             };
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds APMAS health checks to the service collection.
+    /// </summary>
+    public static IServiceCollection AddApmasHealthChecks(this IServiceCollection services)
+    {
+        services.AddHealthChecks()
+            .AddCheck<ApmasHealthCheck>(
+                name: "apmas",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: ["ready", "live"]);
 
         return services;
     }
