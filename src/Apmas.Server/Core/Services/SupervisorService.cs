@@ -74,7 +74,7 @@ public class SupervisorService : BackgroundService
     /// </summary>
     private async Task CheckAgentHealthAsync(CancellationToken cancellationToken)
     {
-        var unhealthyAgentRoles = _heartbeatMonitor.GetUnhealthyAgents();
+        var unhealthyAgentRoles = await _heartbeatMonitor.GetUnhealthyAgentsAsync();
 
         foreach (var agentRole in unhealthyAgentRoles)
         {

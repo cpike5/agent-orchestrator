@@ -20,14 +20,14 @@ public interface IHeartbeatMonitor
     /// </summary>
     /// <param name="agentRole">The role identifier of the agent.</param>
     /// <returns>True if the agent is healthy, false if it has exceeded the timeout.</returns>
-    bool IsAgentHealthy(string agentRole);
+    Task<bool> IsAgentHealthyAsync(string agentRole);
 
     /// <summary>
     /// Gets a list of all unhealthy agents that are currently running
     /// but have exceeded the heartbeat timeout threshold.
     /// </summary>
     /// <returns>List of agent role identifiers that are unhealthy.</returns>
-    IReadOnlyList<string> GetUnhealthyAgents();
+    Task<IReadOnlyList<string>> GetUnhealthyAgentsAsync();
 
     /// <summary>
     /// Removes an agent from the heartbeat tracking dictionary.

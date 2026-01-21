@@ -36,6 +36,11 @@ public class HeartbeatMonitor : IHeartbeatMonitor
 
     public void RecordHeartbeat(string agentRole, string status, string? progress)
     {
+        if (string.IsNullOrWhiteSpace(agentRole))
+            throw new ArgumentException("Agent role cannot be null or empty", nameof(agentRole));
+        if (string.IsNullOrWhiteSpace(status))
+            throw new ArgumentException("Status cannot be null or empty", nameof(status));
+
         var heartbeatInfo = new HeartbeatInfo(DateTime.UtcNow, status, progress);
 
         _heartbeats.AddOrUpdate(
@@ -49,24 +54,51 @@ public class HeartbeatMonitor : IHeartbeatMonitor
             status);
     }
 
-    public bool IsAgentHealthy(string agentRole)
+    public async Task<bool> IsAgentHealthyAsync(string agentRole)
     {
-        // If no heartbeat has been recorded yet, the agent is considered healthy (newly spawned)
-        if (!_heartbeats.TryGetValue(agentRole, out var heartbeatInfo))
+        var heartbeatTimeout = _options.Timeouts.HeartbeatTimeout;
+        var now = DateTime.UtcNow;
+
+        // Check in-memory heartbeat first
+        if (_heartbeats.TryGetValue(agentRole, out var heartbeatInfo))
         {
-            return true;
+            var timeSinceHeartbeat = now - heartbeatInfo.Timestamp;
+            return timeSinceHeartbeat <= heartbeatTimeout;
         }
 
-        var timeSinceHeartbeat = DateTime.UtcNow - heartbeatInfo.Timestamp;
-        var heartbeatTimeout = _options.Timeouts.HeartbeatTimeout;
+        // Fall back to checking AgentState if no in-memory heartbeat exists
+        try
+        {
+            var agent = await _agentStateManager.GetAgentStateAsync(agentRole);
 
-        return timeSinceHeartbeat <= heartbeatTimeout;
+            // Non-Running agents are not being monitored, so they're considered "healthy"
+            if (agent.Status != AgentStatus.Running)
+            {
+                return true;
+            }
+
+            // Use LastHeartbeat or SpawnedAt as baseline
+            var lastHeartbeat = agent.LastHeartbeat ?? agent.SpawnedAt;
+            if (lastHeartbeat == null)
+            {
+                // Agent is Running but has no timestamp - consider unhealthy
+                return false;
+            }
+
+            var timeSinceLastActivity = now - lastHeartbeat.Value;
+            return timeSinceLastActivity <= heartbeatTimeout;
+        }
+        catch (KeyNotFoundException)
+        {
+            // Agent doesn't exist - not healthy
+            return false;
+        }
     }
 
-    public IReadOnlyList<string> GetUnhealthyAgents()
+    public async Task<IReadOnlyList<string>> GetUnhealthyAgentsAsync()
     {
         // Get all active agents from state manager
-        var activeAgents = _agentStateManager.GetActiveAgentsAsync().GetAwaiter().GetResult();
+        var activeAgents = await _agentStateManager.GetActiveAgentsAsync();
 
         // Filter to only Running agents
         var runningAgents = activeAgents.Where(a => a.Status == AgentStatus.Running).ToList();
@@ -86,7 +118,7 @@ public class HeartbeatMonitor : IHeartbeatMonitor
                 {
                     unhealthyAgents.Add(agent.Role);
 
-                    _logger.LogDebug(
+                    _logger.LogInformation(
                         "Agent {AgentRole} is unhealthy (last heartbeat {Minutes:F1} minutes ago)",
                         agent.Role,
                         timeSinceHeartbeat.TotalMinutes);
@@ -99,7 +131,7 @@ public class HeartbeatMonitor : IHeartbeatMonitor
 
                 if (lastHeartbeat == null)
                 {
-                    _logger.LogWarning(
+                    _logger.LogDebug(
                         "Agent {AgentRole} is running but has no heartbeat or spawn timestamp",
                         agent.Role);
                     continue;
@@ -111,7 +143,7 @@ public class HeartbeatMonitor : IHeartbeatMonitor
                 {
                     unhealthyAgents.Add(agent.Role);
 
-                    _logger.LogDebug(
+                    _logger.LogInformation(
                         "Agent {AgentRole} is unhealthy (no heartbeat, spawned {Minutes:F1} minutes ago)",
                         agent.Role,
                         timeSinceSpawn.TotalMinutes);
