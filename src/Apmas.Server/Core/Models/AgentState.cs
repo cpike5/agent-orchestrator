@@ -81,4 +81,9 @@ public class AgentState
     /// Timestamp of the last heartbeat received from this agent.
     /// </summary>
     public DateTime? LastHeartbeat { get; set; }
+
+    /// <summary>
+    /// Recovery context to be passed to the agent on restart after timeout.
+    /// </summary>
+    public string? RecoveryContext { get; set; }
 }

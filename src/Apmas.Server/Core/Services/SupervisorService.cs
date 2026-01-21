@@ -16,6 +16,7 @@ public class SupervisorService : BackgroundService
     private readonly IAgentSpawner _agentSpawner;
     private readonly IMessageBus _messageBus;
     private readonly IHeartbeatMonitor _heartbeatMonitor;
+    private readonly ITimeoutHandler _timeoutHandler;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
 
@@ -24,6 +25,7 @@ public class SupervisorService : BackgroundService
         IAgentSpawner agentSpawner,
         IMessageBus messageBus,
         IHeartbeatMonitor heartbeatMonitor,
+        ITimeoutHandler timeoutHandler,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
     {
@@ -31,6 +33,7 @@ public class SupervisorService : BackgroundService
         _agentSpawner = agentSpawner;
         _messageBus = messageBus;
         _heartbeatMonitor = heartbeatMonitor;
+        _timeoutHandler = timeoutHandler;
         _logger = logger;
         _options = options.Value;
     }
@@ -89,46 +92,11 @@ public class SupervisorService : BackgroundService
     }
 
     /// <summary>
-    /// Handles an unhealthy agent by retrying or escalating.
+    /// Handles an unhealthy agent by delegating to the TimeoutHandler.
     /// </summary>
     private async Task HandleUnhealthyAgentAsync(AgentState agent, CancellationToken cancellationToken)
     {
-        var maxRetries = _options.Timeouts.MaxRetries;
-
-        if (agent.RetryCount >= maxRetries)
-        {
-            _logger.LogError(
-                "Agent {AgentRole} has exceeded max retries ({RetryCount}/{MaxRetries}), escalating to human",
-                agent.Role,
-                agent.RetryCount,
-                maxRetries);
-
-            await _stateManager.UpdateAgentStateAsync(agent.Role, a =>
-            {
-                a.Status = AgentStatus.Escalated;
-                a.LastError = $"Agent timed out after {agent.RetryCount} retries";
-                return a;
-            });
-        }
-        else
-        {
-            _logger.LogWarning(
-                "Agent {AgentRole} timed out, marking for retry (attempt {RetryCount}/{MaxRetries})",
-                agent.Role,
-                agent.RetryCount + 1,
-                maxRetries);
-
-            await _stateManager.UpdateAgentStateAsync(agent.Role, a =>
-            {
-                a.Status = AgentStatus.TimedOut;
-                a.RetryCount = a.RetryCount + 1;
-                a.LastError = "Heartbeat timeout";
-                return a;
-            });
-
-            // TODO: In a future implementation, this would trigger a restart with checkpoint context
-            // For now, we just mark it as timed out for manual intervention
-        }
+        await _timeoutHandler.HandleTimeoutAsync(agent.Role, cancellationToken);
     }
 
     /// <summary>
@@ -153,10 +121,14 @@ public class SupervisorService : BackgroundService
 
                 // Atomically capture agent state and update status to Spawning
                 AgentState? agentState = null;
+                string? recoveryContext = null;
                 await _stateManager.UpdateAgentStateAsync(agentRole, a =>
                 {
                     agentState = a;
+                    recoveryContext = a.RecoveryContext;
                     a.Status = AgentStatus.Spawning;
+                    // Clear recovery context after capturing it
+                    a.RecoveryContext = null;
                     return a;
                 });
 
@@ -166,15 +138,25 @@ public class SupervisorService : BackgroundService
                     continue;
                 }
 
-                _logger.LogInformation("Spawning agent {AgentRole} with subagent type {SubagentType}",
-                    agentState.Role,
-                    agentState.SubagentType);
+                if (recoveryContext != null)
+                {
+                    _logger.LogInformation(
+                        "Spawning agent {AgentRole} with recovery context (retry {RetryCount})",
+                        agentState.Role,
+                        agentState.RetryCount);
+                }
+                else
+                {
+                    _logger.LogInformation("Spawning agent {AgentRole} with subagent type {SubagentType}",
+                        agentState.Role,
+                        agentState.SubagentType);
+                }
 
-                // Spawn the agent
+                // Spawn the agent with recovery context if available
                 var spawnResult = await _agentSpawner.SpawnAgentAsync(
                     agentState.Role,
                     agentState.SubagentType,
-                    checkpointContext: null);
+                    checkpointContext: recoveryContext);
 
                 // Check if spawn was successful
                 if (!spawnResult.Success)
