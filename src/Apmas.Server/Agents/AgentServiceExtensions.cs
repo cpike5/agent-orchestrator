@@ -1,3 +1,4 @@
+using Apmas.Server.Agents.Definitions;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,21 @@ public static class AgentServiceExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IAgentSpawner, ClaudeCodeSpawner>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the agent roster configuration to the service collection.
+    /// </summary>
+    public static IServiceCollection AddAgentRoster(this IServiceCollection services)
+    {
+        services.AddOptions<AgentOptions>()
+            .BindConfiguration("Apmas:Agents")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<AgentRoster>();
 
         return services;
     }
