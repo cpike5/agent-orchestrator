@@ -1,6 +1,7 @@
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Apmas.Server.Mcp;
+using Apmas.Server.Mcp.Resources;
 using Apmas.Server.Mcp.Tools;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +64,11 @@ try
     builder.Services.AddMcpTool<ReportStatusTool>();
     builder.Services.AddMcpTool<RequestHelpTool>();
     builder.Services.AddMcpTool<SendMessageTool>();
+
+    // MCP resources
+    builder.Services.AddMcpResource<ProjectStateResource>();
+    builder.Services.AddMcpResource<AgentMessagesResource>();
+    builder.Services.AddMcpResource<CheckpointResource>();
 
     // TODO: Add hosted services (future issues)
     // builder.Services.AddHostedService<SupervisorService>();
