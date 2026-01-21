@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Core.Services;
@@ -7,6 +8,7 @@ using Apmas.Server.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Apmas.Server.Tests.Mcp.Tools;
@@ -31,7 +33,16 @@ public class HeartbeatToolTests : IDisposable
         _cache = new MemoryCache(new MemoryCacheOptions());
         _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
         _heartbeatMonitor = new FakeHeartbeatMonitor();
-        _tool = new HeartbeatTool(_agentStateManager, _heartbeatMonitor, NullLogger<HeartbeatTool>.Instance);
+
+        var apmasOptions = Options.Create(new ApmasOptions
+        {
+            Timeouts = new TimeoutOptions
+            {
+                HeartbeatTimeoutMinutes = 10
+            }
+        });
+
+        _tool = new HeartbeatTool(_agentStateManager, _heartbeatMonitor, NullLogger<HeartbeatTool>.Instance, apmasOptions);
 
         // Ensure database is created
         using var context = _contextFactory.CreateDbContext();
@@ -355,9 +366,9 @@ public class HeartbeatToolTests : IDisposable
             RecordedHeartbeats.Add(new HeartbeatRecord(agentRole, status, progress));
         }
 
-        public bool IsAgentHealthy(string agentRole) => true;
+        public Task<bool> IsAgentHealthyAsync(string agentRole) => Task.FromResult(true);
 
-        public IReadOnlyList<string> GetUnhealthyAgents() => new List<string>();
+        public Task<IReadOnlyList<string>> GetUnhealthyAgentsAsync() => Task.FromResult<IReadOnlyList<string>>(new List<string>());
 
         public void ClearAgent(string agentRole) { }
 

@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Apmas.Server.Mcp.Tools;
 
@@ -14,15 +16,18 @@ public class HeartbeatTool : IMcpTool
     private readonly IAgentStateManager _agentStateManager;
     private readonly IHeartbeatMonitor _heartbeatMonitor;
     private readonly ILogger<HeartbeatTool> _logger;
+    private readonly ApmasOptions _apmasOptions;
 
     public HeartbeatTool(
         IAgentStateManager agentStateManager,
         IHeartbeatMonitor heartbeatMonitor,
-        ILogger<HeartbeatTool> logger)
+        ILogger<HeartbeatTool> logger,
+        IOptions<ApmasOptions> apmasOptions)
     {
         _agentStateManager = agentStateManager;
         _heartbeatMonitor = heartbeatMonitor;
         _logger = logger;
+        _apmasOptions = apmasOptions.Value;
     }
 
     public string Name => "apmas_heartbeat";
@@ -119,8 +124,8 @@ public class HeartbeatTool : IMcpTool
                 // Update last heartbeat timestamp
                 state.LastHeartbeat = DateTime.UtcNow;
 
-                // Extend timeout by 10 minutes from last heartbeat
-                state.TimeoutAt = state.LastHeartbeat.Value.AddMinutes(10);
+                // Extend timeout by heartbeat timeout from last heartbeat
+                state.TimeoutAt = state.LastHeartbeat.Value.Add(_apmasOptions.Timeouts.HeartbeatTimeout);
 
                 return state;
             });
@@ -130,7 +135,7 @@ public class HeartbeatTool : IMcpTool
 
             _logger.LogInformation("Heartbeat from {AgentRole}: {Status}", agentRole, status);
 
-            var newTimeoutAt = DateTime.UtcNow.AddMinutes(10);
+            var newTimeoutAt = DateTime.UtcNow.Add(_apmasOptions.Timeouts.HeartbeatTimeout);
             var message = $"Heartbeat acknowledged for agent '{agentRole}'. Timeout extended to {newTimeoutAt:yyyy-MM-dd HH:mm:ss} UTC.";
 
             if (progress != null)
