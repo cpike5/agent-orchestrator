@@ -87,6 +87,8 @@ public class SqliteStateStore : IStateStore
                 existing.LastMessage = state.LastMessage;
                 existing.LastError = state.LastError;
                 existing.EstimatedContextUsage = state.EstimatedContextUsage;
+                existing.LastHeartbeat = state.LastHeartbeat;
+                existing.RecoveryContext = state.RecoveryContext;
             }
             else
             {
