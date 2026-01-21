@@ -43,6 +43,13 @@ public interface IStateStore
     Task SaveCheckpointAsync(Checkpoint checkpoint);
 
     /// <summary>
+    /// Gets the checkpoint history for an agent, ordered by creation time descending.
+    /// </summary>
+    /// <param name="role">The agent role to get checkpoints for.</param>
+    /// <param name="limit">Maximum number of checkpoints to return, or null for all.</param>
+    Task<IReadOnlyList<Checkpoint>> GetCheckpointHistoryAsync(string role, int? limit = null);
+
+    /// <summary>
     /// Gets messages, optionally filtered by role and time.
     /// </summary>
     /// <param name="role">Filter to messages to/from this role, or null for all.</param>
