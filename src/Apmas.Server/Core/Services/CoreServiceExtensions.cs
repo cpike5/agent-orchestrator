@@ -1,6 +1,8 @@
 using Apmas.Server.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 
 namespace Apmas.Server.Core.Services;
 
@@ -23,6 +25,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<ITimeoutHandler, TimeoutHandler>();
         services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
+        services.AddSingleton<IApmasMetrics, ApmasMetrics>();
         services.AddNotificationServices();
         services.AddHostedService<SupervisorService>();
         return services;
@@ -52,6 +55,40 @@ public static class CoreServiceExtensions
                 _ => sp.GetRequiredService<ConsoleNotificationService>()
             };
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds OpenTelemetry metrics export based on configuration.
+    /// Call this method when OpenTelemetry export is enabled in configuration.
+    /// </summary>
+    public static IServiceCollection AddApmasMetricsExport(this IServiceCollection services, MetricsOptions metricsOptions)
+    {
+        if (!metricsOptions.OpenTelemetry.Enabled)
+        {
+            return services;
+        }
+
+        services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService("Apmas.Server"))
+            .WithMetrics(metrics =>
+            {
+                metrics.AddMeter("Apmas.Server");
+
+                if (!string.IsNullOrEmpty(metricsOptions.OpenTelemetry.Endpoint))
+                {
+                    metrics.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri(metricsOptions.OpenTelemetry.Endpoint);
+                    });
+                }
+                else
+                {
+                    // Use default OTLP endpoint (localhost:4317) or OTEL environment variables
+                    metrics.AddOtlpExporter();
+                }
+            });
 
         return services;
     }

@@ -29,7 +29,8 @@ public class GetContextToolTests : IDisposable
 
         var cache = new MemoryCache(new MemoryCacheOptions());
         _stateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, cache);
-        _messageBus = new MessageBus(_stateStore, NullLogger<MessageBus>.Instance);
+        var fakeMetrics = new FakeApmasMetrics();
+        _messageBus = new MessageBus(_stateStore, fakeMetrics, NullLogger<MessageBus>.Instance);
 
         _tool = new GetContextTool(_stateManager, _messageBus, _stateStore, NullLogger<GetContextTool>.Instance);
 
@@ -394,5 +395,19 @@ public class GetContextToolTests : IDisposable
         {
             return new ApmasDbContext(_options);
         }
+    }
+
+    private class FakeApmasMetrics : IApmasMetrics
+    {
+        public void RecordAgentSpawned(string role) { }
+        public void RecordAgentCompleted(string role) { }
+        public void RecordAgentFailed(string role, string reason) { }
+        public void RecordAgentTimedOut(string role) { }
+        public void RecordMessageSent(string messageType) { }
+        public void RecordCheckpointSaved(string role) { }
+        public void RecordAgentDuration(string role, double durationSeconds) { }
+        public void RecordHeartbeatInterval(double intervalSeconds) { }
+        public Task UpdateCachedMetricsAsync() => Task.CompletedTask;
+        public void Dispose() { }
     }
 }

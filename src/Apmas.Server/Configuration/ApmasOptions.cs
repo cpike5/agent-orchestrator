@@ -49,6 +49,11 @@ public class ApmasOptions
     public NotificationOptions Notifications { get; set; } = new();
 
     /// <summary>
+    /// Metrics and observability configuration.
+    /// </summary>
+    public MetricsOptions Metrics { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>
