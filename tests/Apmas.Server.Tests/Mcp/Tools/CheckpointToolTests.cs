@@ -1,8 +1,11 @@
 using System.Text.Json;
+using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
+using Apmas.Server.Core.Services;
 using Apmas.Server.Mcp.Tools;
 using Apmas.Server.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Apmas.Server.Tests.Mcp.Tools;
@@ -11,7 +14,9 @@ public class CheckpointToolTests : IDisposable
 {
     private readonly IDbContextFactory<ApmasDbContext> _contextFactory;
     private readonly SqliteStateStore _stateStore;
+    private readonly AgentStateManager _agentStateManager;
     private readonly CheckpointTool _tool;
+    private readonly IMemoryCache _cache;
 
     public CheckpointToolTests()
     {
@@ -21,7 +26,9 @@ public class CheckpointToolTests : IDisposable
 
         _contextFactory = new TestDbContextFactory(options);
         _stateStore = new SqliteStateStore(_contextFactory, NullLogger<SqliteStateStore>.Instance);
-        _tool = new CheckpointTool(_stateStore, NullLogger<CheckpointTool>.Instance);
+        _cache = new MemoryCache(new MemoryCacheOptions());
+        _agentStateManager = new AgentStateManager(_stateStore, NullLogger<AgentStateManager>.Instance, _cache);
+        _tool = new CheckpointTool(_agentStateManager, _stateStore, NullLogger<CheckpointTool>.Instance);
 
         // Ensure database is created
         using var context = _contextFactory.CreateDbContext();
@@ -66,7 +73,15 @@ public class CheckpointToolTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_WithValidInput_SavesCheckpoint()
     {
-        // Arrange
+        // Arrange - Create an agent first
+        var agent = new AgentState
+        {
+            Role = "developer",
+            SubagentType = "developer-subagent",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
         var input = JsonDocument.Parse(@"{
             ""agentRole"": ""developer"",
             ""summary"": ""Completed feature A"",
@@ -98,7 +113,15 @@ public class CheckpointToolTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_WithoutOptionalFields_SavesCheckpoint()
     {
-        // Arrange
+        // Arrange - Create an agent first
+        var agent = new AgentState
+        {
+            Role = "reviewer",
+            SubagentType = "reviewer-subagent",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
         var input = JsonDocument.Parse(@"{
             ""agentRole"": ""reviewer"",
             ""summary"": ""Review in progress"",
@@ -217,7 +240,15 @@ public class CheckpointToolTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_EmptyArrays_SavesCheckpoint()
     {
-        // Arrange
+        // Arrange - Create an agent first
+        var agent = new AgentState
+        {
+            Role = "architect",
+            SubagentType = "architect-subagent",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
         var input = JsonDocument.Parse(@"{
             ""agentRole"": ""architect"",
             ""summary"": ""Planning phase"",
@@ -241,7 +272,15 @@ public class CheckpointToolTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_ReturnsSuccessMessage_WithPercentComplete()
     {
-        // Arrange
+        // Arrange - Create an agent first
+        var agent = new AgentState
+        {
+            Role = "developer",
+            SubagentType = "developer-subagent",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
         var input = JsonDocument.Parse(@"{
             ""agentRole"": ""developer"",
             ""summary"": ""Progress update"",
@@ -263,7 +302,15 @@ public class CheckpointToolTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_FiltersOutEmptyStringsInArrays()
     {
-        // Arrange
+        // Arrange - Create an agent first
+        var agent = new AgentState
+        {
+            Role = "developer",
+            SubagentType = "developer-subagent",
+            Status = AgentStatus.Running
+        };
+        await _stateStore.SaveAgentStateAsync(agent);
+
         var input = JsonDocument.Parse(@"{
             ""agentRole"": ""developer"",
             ""summary"": ""Test filtering"",

@@ -128,13 +128,28 @@ public class GetContextTool : IMcpTool
             // Add agent states if requested
             if (include.Contains("agents"))
             {
-                IReadOnlyList<Core.Models.AgentState> agents;
+                IReadOnlyList<Core.Models.AgentState> agents = new List<Core.Models.AgentState>();
 
                 if (agentRoles != null && agentRoles.Count > 0)
                 {
-                    // Get specific agents by role
-                    var agentTasks = agentRoles.Select(role => _stateManager.GetAgentStateAsync(role));
-                    agents = (await Task.WhenAll(agentTasks)).ToList();
+                    // Get specific agents by role, handling non-existent agents gracefully
+                    var agentList = new List<Core.Models.AgentState>();
+                    foreach (var role in agentRoles)
+                    {
+                        try
+                        {
+                            var agent = await _stateManager.GetAgentStateAsync(role);
+                            if (agent != null)
+                            {
+                                agentList.Add(agent);
+                            }
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            _logger.LogWarning("Agent with role '{AgentRole}' not found during context retrieval", role);
+                        }
+                    }
+                    agents = agentList;
                 }
                 else
                 {
@@ -183,13 +198,28 @@ public class GetContextTool : IMcpTool
             // Add artifacts if requested
             if (include.Contains("artifacts"))
             {
-                IReadOnlyList<Core.Models.AgentState> agents;
+                IReadOnlyList<Core.Models.AgentState> agents = new List<Core.Models.AgentState>();
 
                 if (agentRoles != null && agentRoles.Count > 0)
                 {
-                    // Get specific agents by role
-                    var agentTasks = agentRoles.Select(role => _stateManager.GetAgentStateAsync(role));
-                    agents = (await Task.WhenAll(agentTasks)).ToList();
+                    // Get specific agents by role, handling non-existent agents gracefully
+                    var agentList = new List<Core.Models.AgentState>();
+                    foreach (var role in agentRoles)
+                    {
+                        try
+                        {
+                            var agent = await _stateManager.GetAgentStateAsync(role);
+                            if (agent != null)
+                            {
+                                agentList.Add(agent);
+                            }
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            _logger.LogWarning("Agent with role '{AgentRole}' not found during artifact retrieval", role);
+                        }
+                    }
+                    agents = agentList;
                 }
                 else
                 {

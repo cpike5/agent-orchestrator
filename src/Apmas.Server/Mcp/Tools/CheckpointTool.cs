@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Apmas.Server.Core.Models;
+using Apmas.Server.Core.Services;
 using Apmas.Server.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -12,11 +13,16 @@ namespace Apmas.Server.Mcp.Tools;
 /// </summary>
 public class CheckpointTool : IMcpTool
 {
+    private readonly IAgentStateManager _stateManager;
     private readonly IStateStore _stateStore;
     private readonly ILogger<CheckpointTool> _logger;
 
-    public CheckpointTool(IStateStore stateStore, ILogger<CheckpointTool> logger)
+    public CheckpointTool(
+        IAgentStateManager stateManager,
+        IStateStore stateStore,
+        ILogger<CheckpointTool> logger)
     {
+        _stateManager = stateManager;
         _stateStore = stateStore;
         _logger = logger;
     }
@@ -118,6 +124,20 @@ public class CheckpointTool : IMcpTool
             if (input.TryGetProperty("notes", out var notesElement))
             {
                 notes = notesElement.GetString();
+            }
+
+            // Verify agent exists before saving checkpoint
+            try
+            {
+                var agentState = await _stateManager.GetAgentStateAsync(agentRole);
+                if (agentState == null)
+                {
+                    return ToolResult.Error($"Agent with role '{agentRole}' not found");
+                }
+            }
+            catch (KeyNotFoundException)
+            {
+                return ToolResult.Error($"Agent with role '{agentRole}' not found");
             }
 
             // Create checkpoint

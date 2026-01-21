@@ -180,7 +180,8 @@ public class RequestHelpTool : IMcpTool
             From = agentRole,
             To = "supervisor",
             Type = MessageType.Request,
-            Content = $"HUMAN HELP REQUESTED: {fullMessage}"
+            Content = $"HUMAN HELP REQUESTED: {fullMessage}",
+            Timestamp = DateTime.UtcNow
         };
 
         await _messageBus.PublishAsync(message);
@@ -198,6 +199,20 @@ public class RequestHelpTool : IMcpTool
     /// </summary>
     private async Task<string> HandleAgentHelpAsync(string agentRole, string targetAgent, string issue, string fullMessage)
     {
+        // Verify target agent exists
+        try
+        {
+            var targetAgentState = await _stateManager.GetAgentStateAsync(targetAgent);
+            if (targetAgentState == null)
+            {
+                return $"Target agent '{targetAgent}' not found. Cannot send help request.";
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            return $"Target agent '{targetAgent}' not found. Cannot send help request.";
+        }
+
         // Send question message to target agent
         var message = new AgentMessage
         {
@@ -205,7 +220,8 @@ public class RequestHelpTool : IMcpTool
             From = agentRole,
             To = targetAgent,
             Type = MessageType.Question,
-            Content = fullMessage
+            Content = fullMessage,
+            Timestamp = DateTime.UtcNow
         };
 
         await _messageBus.PublishAsync(message);
@@ -231,7 +247,8 @@ public class RequestHelpTool : IMcpTool
             From = agentRole,
             To = "supervisor",
             Type = MessageType.Question,
-            Content = $"CLARIFICATION NEEDED: {fullMessage}"
+            Content = $"CLARIFICATION NEEDED: {fullMessage}",
+            Timestamp = DateTime.UtcNow
         };
 
         await _messageBus.PublishAsync(message);

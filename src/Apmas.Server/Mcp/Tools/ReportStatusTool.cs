@@ -176,10 +176,8 @@ public class ReportStatusTool : IMcpTool
                     state.ArtifactsJson = JsonSerializer.Serialize(existingArtifacts);
                 }
 
-                if (agentStatus == AgentStatus.Completed)
-                {
-                    state.CompletedAt = DateTime.UtcNow;
-                }
+                // Note: CompletedAt should only be set by CompleteTool to ensure consistency
+                // ReportStatusTool only updates the status, not completion timestamps
 
                 return state;
             });
@@ -194,7 +192,8 @@ public class ReportStatusTool : IMcpTool
                 Content = message,
                 ArtifactsJson = artifacts != null && artifacts.Count > 0
                     ? JsonSerializer.Serialize(artifacts)
-                    : null
+                    : null,
+                Timestamp = DateTime.UtcNow
             };
 
             await _messageBus.PublishAsync(busMessage);

@@ -111,15 +111,19 @@ public class HeartbeatTool : IMcpTool
                     state.EstimatedContextUsage = estimatedContextUsage.Value;
                 }
 
-                // Extend timeout by 10 minutes from now
-                state.TimeoutAt = DateTime.UtcNow.AddMinutes(10);
+                // Update last heartbeat timestamp
+                state.LastHeartbeat = DateTime.UtcNow;
+
+                // Extend timeout by 10 minutes from last heartbeat
+                state.TimeoutAt = state.LastHeartbeat.Value.AddMinutes(10);
 
                 return state;
             });
 
             _logger.LogInformation("Heartbeat from {AgentRole}: {Status}", agentRole, status);
 
-            var message = $"Heartbeat acknowledged for agent '{agentRole}'. Timeout extended to {DateTime.UtcNow.AddMinutes(10):yyyy-MM-dd HH:mm:ss} UTC.";
+            var newTimeoutAt = DateTime.UtcNow.AddMinutes(10);
+            var message = $"Heartbeat acknowledged for agent '{agentRole}'. Timeout extended to {newTimeoutAt:yyyy-MM-dd HH:mm:ss} UTC.";
 
             if (progress != null)
             {

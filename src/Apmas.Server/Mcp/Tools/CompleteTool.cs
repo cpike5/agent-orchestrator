@@ -127,7 +127,35 @@ public class CompleteTool : IMcpTool
             {
                 agentState.Status = AgentStatus.Completed;
                 agentState.CompletedAt = DateTime.UtcNow;
-                agentState.ArtifactsJson = JsonSerializer.Serialize(artifacts);
+
+                // Merge artifacts with existing ones to avoid losing data
+                var existingArtifacts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(agentState.ArtifactsJson))
+                {
+                    try
+                    {
+                        var existing = JsonSerializer.Deserialize<List<string>>(agentState.ArtifactsJson);
+                        if (existing != null)
+                        {
+                            existingArtifacts.AddRange(existing);
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to deserialize existing artifacts for {AgentRole}, starting fresh", agentRole);
+                    }
+                }
+
+                // Add new artifacts, avoiding duplicates
+                foreach (var artifact in artifacts)
+                {
+                    if (!existingArtifacts.Contains(artifact))
+                    {
+                        existingArtifacts.Add(artifact);
+                    }
+                }
+
+                agentState.ArtifactsJson = JsonSerializer.Serialize(existingArtifacts);
                 agentState.LastMessage = summary;
                 return agentState;
             });
@@ -147,7 +175,8 @@ public class CompleteTool : IMcpTool
                 To = "supervisor",
                 Type = MessageType.Done,
                 Content = messageContent,
-                ArtifactsJson = JsonSerializer.Serialize(artifacts)
+                ArtifactsJson = JsonSerializer.Serialize(artifacts),
+                Timestamp = DateTime.UtcNow
             };
 
             await _messageBus.PublishAsync(message);

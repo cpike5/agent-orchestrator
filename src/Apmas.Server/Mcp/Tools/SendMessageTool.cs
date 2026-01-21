@@ -116,7 +116,8 @@ public class SendMessageTool : IMcpTool
                 From = agentRole,
                 To = to,
                 Type = messageType.Value,
-                Content = content
+                Content = content,
+                Timestamp = DateTime.UtcNow
             };
 
             await _messageBus.PublishAsync(message);
