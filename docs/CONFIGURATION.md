@@ -123,11 +123,12 @@ Controls how Claude Code agents are launched.
 | `ClaudeCodePath` | string | `"claude"` | Path to Claude Code CLI (assumes in PATH if just "claude") |
 | `Model` | string | `"sonnet"` | Model to use ("sonnet", "opus") |
 | `MaxTurns` | int | `100` | Maximum turns before agent stops |
-| `PromptsDirectory` | string | `"Agents/Prompts"` | Path to prompt templates |
 | `McpConfigPath` | string | `null` | Path to MCP config file (generated if null) |
 | `GracefulShutdownTimeoutMs` | int | `5000` | Timeout for graceful termination |
 | `DangerouslySkipPermissions` | bool | `true` | Skip permission checks when spawning |
 | `OutputFormat` | string | `"stream-json"` | Output format for Claude Code CLI |
+
+> **Note:** Agent prompts are defined as C# classes in `src/Apmas.Server/Agents/Prompts/` and registered via `IPromptFactory`. Each prompt class specifies its `SubagentType` property which is used for resolution.
 
 ### Example
 
@@ -138,7 +139,6 @@ Controls how Claude Code agents are launched.
       "ClaudeCodePath": "claude",
       "Model": "sonnet",
       "MaxTurns": 100,
-      "PromptsDirectory": "Agents/Prompts",
       "GracefulShutdownTimeoutMs": 5000,
       "DangerouslySkipPermissions": true,
       "OutputFormat": "stream-json"

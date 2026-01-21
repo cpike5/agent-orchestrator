@@ -22,12 +22,6 @@ public class SpawnerOptions
     public int MaxTurns { get; set; } = 100;
 
     /// <summary>
-    /// Path to the directory containing agent prompt templates.
-    /// Relative to the working directory.
-    /// </summary>
-    public string PromptsDirectory { get; set; } = "Agents/Prompts";
-
-    /// <summary>
     /// Path to the MCP server configuration file.
     /// If null, will be generated dynamically.
     /// </summary>

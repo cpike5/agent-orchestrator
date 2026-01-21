@@ -82,7 +82,7 @@ src/Apmas.Server/
 │   ├── Tools/         # MCP tool handlers
 │   └── Resources/     # MCP resource handlers
 ├── Agents/
-│   ├── Prompts/       # Agent prompt templates
+│   ├── Prompts/       # Agent prompt classes (C#) and IPromptFactory
 │   └── Definitions/   # AgentRoster configuration
 └── Storage/           # IStateStore implementations (SQLite, File)
 ```

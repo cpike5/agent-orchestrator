@@ -1,4 +1,5 @@
 using Apmas.Server.Agents.Definitions;
+using Apmas.Server.Agents.Prompts;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +37,24 @@ public static class AgentServiceExtensions
             .ValidateOnStart();
 
         services.AddSingleton<AgentRoster>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds agent prompt templates to the service collection.
+    /// </summary>
+    public static IServiceCollection AddAgentPrompts(this IServiceCollection services)
+    {
+        // Register all prompt classes as BaseAgentPrompt for collection injection
+        services.AddSingleton<BaseAgentPrompt, ArchitectPrompt>();
+        services.AddSingleton<BaseAgentPrompt, DesignerPrompt>();
+        services.AddSingleton<BaseAgentPrompt, DeveloperPrompt>();
+        services.AddSingleton<BaseAgentPrompt, ReviewerPrompt>();
+        services.AddSingleton<BaseAgentPrompt, TesterPrompt>();
+
+        // Register the factory
+        services.AddSingleton<IPromptFactory, PromptFactory>();
 
         return services;
     }

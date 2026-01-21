@@ -64,6 +64,7 @@ try
 
     // Agent roster and spawner
     builder.Services.AddAgentRoster();
+    builder.Services.AddAgentPrompts();
     builder.Services.AddAgentSpawner();
 
     // MCP server

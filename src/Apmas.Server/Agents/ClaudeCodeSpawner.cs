@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Apmas.Server.Agents.Prompts;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Core.Services;
@@ -19,16 +20,22 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
     private readonly ILogger<ClaudeCodeSpawner> _logger;
     private readonly ApmasOptions _apmasOptions;
     private readonly SpawnerOptions _spawnerOptions;
+    private readonly IPromptFactory _promptFactory;
+    private readonly IAgentStateManager _stateManager;
     private readonly ConcurrentDictionary<string, ManagedProcess> _processes = new();
 
     public ClaudeCodeSpawner(
         ILogger<ClaudeCodeSpawner> logger,
         IOptions<ApmasOptions> apmasOptions,
-        IOptions<SpawnerOptions> spawnerOptions)
+        IOptions<SpawnerOptions> spawnerOptions,
+        IPromptFactory promptFactory,
+        IAgentStateManager stateManager)
     {
         _logger = logger;
         _apmasOptions = apmasOptions.Value;
         _spawnerOptions = spawnerOptions.Value;
+        _promptFactory = promptFactory;
+        _stateManager = stateManager;
     }
 
     public async Task<SpawnResult> SpawnAgentAsync(
@@ -53,7 +60,7 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
             throw new InvalidOperationException($"Agent with role '{agentRole}' is already running");
         }
 
-        var taskId = Guid.NewGuid().ToString("N");
+        var taskId = Guid.NewGuid().ToString("D");
         string? tempPromptFile = null;
         Process? process = null;
 
@@ -292,27 +299,30 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         string subagentType,
         string? checkpointContext)
     {
-        var promptFileName = $"{subagentType}.md";
-        var promptPath = Path.Combine(_apmasOptions.WorkingDirectory, _spawnerOptions.PromptsDirectory, promptFileName);
+        // Get project state for prompt generation
+        var projectState = await _stateManager.GetProjectStateAsync();
 
-        if (!File.Exists(promptPath))
+        // Generate prompt content from C# prompt class
+        string promptContent;
+        try
         {
-            throw new FileNotFoundException($"Prompt template not found: {promptPath}");
+            promptContent = _promptFactory.GeneratePrompt(subagentType, projectState, checkpointContext);
+        }
+        catch (ArgumentException ex) when (ex.ParamName == nameof(subagentType))
+        {
+            _logger.LogError("No prompt template found for subagent type {SubagentType}. " +
+                "Ensure a prompt class with matching SubagentType property is registered.",
+                subagentType);
+            throw new InvalidOperationException(
+                $"No prompt template registered for subagent type '{subagentType}'", ex);
         }
 
-        var promptContent = await File.ReadAllTextAsync(promptPath);
-
-        // If there's checkpoint context, prepend it
-        if (!string.IsNullOrEmpty(checkpointContext))
-        {
-            promptContent = $"## Recovery Context\n\n{checkpointContext}\n\n---\n\n{promptContent}";
-        }
-
-        // Create temp file
+        // Create temp file with the generated prompt
         var tempFile = Path.GetTempFileName();
         await File.WriteAllTextAsync(tempFile, promptContent);
 
-        _logger.LogDebug("Created temp prompt file {TempFile} for agent {AgentRole}", tempFile, agentRole);
+        _logger.LogDebug("Created temp prompt file {TempFile} for agent {AgentRole} (subagent: {SubagentType})",
+            tempFile, agentRole, subagentType);
 
         return tempFile;
     }
