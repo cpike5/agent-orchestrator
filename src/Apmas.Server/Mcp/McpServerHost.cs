@@ -13,6 +13,7 @@ namespace Apmas.Server.Mcp;
 public class McpServerHost : BackgroundService
 {
     private readonly McpToolRegistry _toolRegistry;
+    private readonly McpResourceRegistry _resourceRegistry;
     private readonly ILogger<McpServerHost> _logger;
     private readonly Stream _inputStream;
     private readonly Stream _outputStream;
@@ -26,9 +27,11 @@ public class McpServerHost : BackgroundService
 
     public McpServerHost(
         McpToolRegistry toolRegistry,
+        McpResourceRegistry resourceRegistry,
         ILogger<McpServerHost> logger)
     {
         _toolRegistry = toolRegistry;
+        _resourceRegistry = resourceRegistry;
         _logger = logger;
         _inputStream = Console.OpenStandardInput();
         _outputStream = Console.OpenStandardOutput();
@@ -213,6 +216,8 @@ public class McpServerHost : BackgroundService
                 "initialize" => await HandleInitializeAsync(message, cancellationToken),
                 "tools/list" => await HandleToolsListAsync(message, cancellationToken),
                 "tools/call" => await HandleToolsCallAsync(message, cancellationToken),
+                "resources/list" => await HandleResourcesListAsync(message, cancellationToken),
+                "resources/read" => await HandleResourcesReadAsync(message, cancellationToken),
                 _ => CreateErrorResponse(id, -32601, $"Method not found: {method}")
             };
 
@@ -257,8 +262,8 @@ public class McpServerHost : BackgroundService
                 ["protocolVersion"] = ProtocolVersion,
                 ["capabilities"] = new JsonObject
                 {
-                    ["tools"] = new JsonObject()
-                    // Resources capability removed until implemented
+                    ["tools"] = new JsonObject(),
+                    ["resources"] = new JsonObject()
                 },
                 ["serverInfo"] = new JsonObject
                 {
@@ -371,6 +376,113 @@ public class McpServerHost : BackgroundService
         {
             _logger.LogError(ex, "Tool {ToolName} execution failed", toolName);
             return CreateToolErrorResponse(id, $"Tool execution error: {ex.Message}");
+        }
+    }
+
+    private async Task<JsonObject> HandleResourcesListAsync(JsonObject request, CancellationToken cancellationToken)
+    {
+        var id = request["id"];
+
+        var resources = await _resourceRegistry.ListAllResourcesAsync(cancellationToken);
+
+        var resourcesArray = new JsonArray();
+        foreach (var resource in resources)
+        {
+            var resourceObject = new JsonObject
+            {
+                ["uri"] = resource.Uri,
+                ["name"] = resource.Name
+            };
+
+            if (resource.Description != null)
+            {
+                resourceObject["description"] = resource.Description;
+            }
+
+            if (resource.MimeType != null)
+            {
+                resourceObject["mimeType"] = resource.MimeType;
+            }
+
+            resourcesArray.Add(resourceObject);
+        }
+
+        var response = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id?.DeepClone(),
+            ["result"] = new JsonObject
+            {
+                ["resources"] = resourcesArray
+            }
+        };
+
+        _logger.LogDebug("Returning {Count} resources", resources.Count);
+        return response;
+    }
+
+    private async Task<JsonObject> HandleResourcesReadAsync(JsonObject request, CancellationToken cancellationToken)
+    {
+        var id = request["id"];
+        var @params = request["params"]?.AsObject();
+        var uri = @params?["uri"]?.GetValue<string>();
+
+        if (string.IsNullOrEmpty(uri))
+        {
+            return CreateErrorResponse(id, -32602, "Invalid params: missing resource uri");
+        }
+
+        var resource = _resourceRegistry.FindResource(uri);
+        if (resource == null)
+        {
+            return CreateErrorResponse(id, -32602, $"Resource not found: {uri}");
+        }
+
+        _logger.LogInformation("Reading resource: {ResourceUri}", uri);
+
+        try
+        {
+            var result = await resource.ReadAsync(uri, cancellationToken);
+
+            var contentsArray = new JsonArray();
+            foreach (var content in result.Contents)
+            {
+                var contentObject = new JsonObject
+                {
+                    ["uri"] = content.Uri,
+                    ["mimeType"] = content.MimeType
+                };
+
+                if (content.Text != null)
+                {
+                    contentObject["text"] = content.Text;
+                }
+
+                if (content.Blob != null)
+                {
+                    contentObject["blob"] = content.Blob;
+                }
+
+                contentsArray.Add(contentObject);
+            }
+
+            var response = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = id?.DeepClone(),
+                ["result"] = new JsonObject
+                {
+                    ["contents"] = contentsArray
+                }
+            };
+
+            _logger.LogInformation("Resource {ResourceUri} read successfully", uri);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Resource {ResourceUri} read failed", uri);
+            return CreateErrorResponse(id, -32603, $"Resource read error: {ex.Message}");
         }
     }
 

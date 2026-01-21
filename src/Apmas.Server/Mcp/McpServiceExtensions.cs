@@ -15,6 +15,12 @@ public static class McpServiceExtensions
         // Register tool registry as singleton
         services.AddSingleton<McpToolRegistry>();
 
+        // Register resource registry as singleton
+        services.AddSingleton<McpResourceRegistry>();
+
+        // Add memory cache for resource caching
+        services.AddMemoryCache();
+
         // Register MCP server host as a hosted service
         services.AddHostedService<McpServerHost>();
 
@@ -30,6 +36,19 @@ public static class McpServiceExtensions
     {
         // Register the tool as a singleton
         services.AddSingleton<IMcpTool, TImplementation>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an MCP resource implementation with the resource registry.
+    /// </summary>
+    /// <typeparam name="TImplementation">The resource implementation type.</typeparam>
+    public static IServiceCollection AddMcpResource<TImplementation>(this IServiceCollection services)
+        where TImplementation : class, IMcpResource
+    {
+        // Register the resource as a singleton
+        services.AddSingleton<IMcpResource, TImplementation>();
 
         return services;
     }
