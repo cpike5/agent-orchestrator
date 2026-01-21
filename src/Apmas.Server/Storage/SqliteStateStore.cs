@@ -135,6 +135,21 @@ public class SqliteStateStore : IStateStore
         }
     }
 
+    public async Task<IReadOnlyList<Checkpoint>> GetCheckpointHistoryAsync(string role, int? limit = null)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var query = context.Checkpoints
+            .Where(c => c.AgentRole == role)
+            .OrderByDescending(c => c.CreatedAt);
+
+        if (limit.HasValue)
+        {
+            return await query.Take(limit.Value).ToListAsync();
+        }
+
+        return await query.ToListAsync();
+    }
+
     public async Task<IReadOnlyList<AgentMessage>> GetMessagesAsync(
         string? role = null,
         DateTime? since = null,

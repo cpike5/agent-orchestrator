@@ -19,6 +19,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<IMessageBus, MessageBus>();
         services.AddSingleton<IHeartbeatMonitor, HeartbeatMonitor>();
         services.AddSingleton<ITimeoutHandler, TimeoutHandler>();
+        services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
         services.AddHostedService<SupervisorService>();
         return services;
