@@ -1,4 +1,6 @@
+using Apmas.Server.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Apmas.Server.Core.Services;
 
@@ -21,7 +23,36 @@ public static class CoreServiceExtensions
         services.AddSingleton<ITimeoutHandler, TimeoutHandler>();
         services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
+        services.AddNotificationServices();
         services.AddHostedService<SupervisorService>();
+        return services;
+    }
+
+    /// <summary>
+    /// Adds notification services based on configuration.
+    /// </summary>
+    public static IServiceCollection AddNotificationServices(this IServiceCollection services)
+    {
+        // Register HttpClient for SlackNotificationService
+        services.AddHttpClient();
+
+        // Register all implementations as transient so they can be resolved individually
+        services.AddTransient<ConsoleNotificationService>();
+        services.AddTransient<EmailNotificationService>();
+        services.AddTransient<SlackNotificationService>();
+
+        // Register INotificationService using a factory that selects based on config
+        services.AddSingleton<INotificationService>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<ApmasOptions>>().Value;
+            return options.Notifications.Provider switch
+            {
+                NotificationProvider.Email => sp.GetRequiredService<EmailNotificationService>(),
+                NotificationProvider.Slack => sp.GetRequiredService<SlackNotificationService>(),
+                _ => sp.GetRequiredService<ConsoleNotificationService>()
+            };
+        });
+
         return services;
     }
 }

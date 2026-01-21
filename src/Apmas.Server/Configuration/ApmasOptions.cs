@@ -44,6 +44,11 @@ public class ApmasOptions
     public DecompositionOptions Decomposition { get; set; } = new();
 
     /// <summary>
+    /// Notification configuration.
+    /// </summary>
+    public NotificationOptions Notifications { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>
