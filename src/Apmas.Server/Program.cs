@@ -78,6 +78,21 @@ try
     // Ensure database is created
     await host.Services.EnsureStorageCreatedAsync();
 
+    // Validate dependency graph at startup
+    var dependencyResolver = host.Services.GetRequiredService<IDependencyResolver>();
+    var validationResult = dependencyResolver.ValidateDependencyGraph();
+
+    if (!validationResult.IsValid)
+    {
+        Log.Error("Dependency graph validation failed:");
+        foreach (var error in validationResult.Errors)
+        {
+            Log.Error("  - {Error}", error);
+        }
+        Log.Fatal("APMAS cannot start due to invalid dependency configuration");
+        return 1;
+    }
+
     await host.RunAsync();
 }
 catch (Exception ex)
