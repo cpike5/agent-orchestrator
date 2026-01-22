@@ -18,7 +18,7 @@
             /* Text hierarchy */
             --color-text-primary: #e3e8ef;
             --color-text-secondary: #9ca3af;
-            --color-text-tertiary: #6b7280;
+            --color-text-tertiary: #8b95a5;
             --color-text-disabled: #4b5563;
 
             /* Borders & dividers */
@@ -79,6 +79,22 @@
             --connection-reconnecting: #f59e0b;
             --connection-disconnected: #ef4444;
 
+            /* Enhanced tokens for new features */
+            --color-header-accent-start: #1e3a5f;
+            --color-header-accent-end: #0f1419;
+            --color-panel-bg: #1a1f28;
+            --color-panel-overlay: rgba(0, 0, 0, 0.85);
+            --color-stats-bg: #252b36;
+            --color-stats-border: #2d3748;
+            --color-stats-value: #3b82f6;
+            --color-group-header-bg: #1a1f28;
+            --color-group-header-text: #9ca3af;
+            --color-empty-icon: #4a5568;
+            --color-empty-icon-bg: rgba(59, 130, 246, 0.1);
+            --color-tooltip-bg: #2d3748;
+            --color-tooltip-text: #e3e8ef;
+            --color-tooltip-border: #4a5568;
+
             /* Font families */
             --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                 "Helvetica Neue", Arial, sans-serif;
@@ -127,6 +143,17 @@
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
             --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.3);
+
+            /* Animation durations */
+            --duration-fast: 0.15s;
+            --duration-normal: 0.25s;
+            --duration-slow: 0.4s;
+
+            /* Easing functions */
+            --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+            --ease-out: cubic-bezier(0, 0, 0.2, 1);
+            --ease-in: cubic-bezier(0.4, 0, 1, 1);
+            --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
         /* ============================================
@@ -157,7 +184,7 @@
         a {
             color: var(--color-interactive-default);
             text-decoration: none;
-            transition: color 0.2s ease;
+            transition: color var(--duration-fast) var(--ease-out);
         }
 
         a:hover {
@@ -191,12 +218,17 @@
 
         /* Header */
         header {
-            background-color: var(--color-bg-elevated);
+            background: linear-gradient(
+                180deg,
+                var(--color-header-accent-start) 0%,
+                var(--color-bg-elevated) 100%
+            );
             border-bottom: 1px solid var(--color-border-default);
             padding: var(--space-5) var(--space-6);
             position: sticky;
             top: 0;
             z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .header-top {
@@ -225,6 +257,9 @@
         }
 
         .phase-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
             font-size: var(--text-sm);
             font-weight: var(--font-medium);
             background-color: var(--status-running-bg);
@@ -232,6 +267,17 @@
             padding: var(--space-1) var(--space-3);
             border-radius: var(--radius-md);
             color: var(--status-running);
+            transition: all var(--duration-normal) var(--ease-out);
+        }
+
+        .phase-badge[data-phase="Execution"] {
+            animation: pulse-badge 2s ease-in-out infinite;
+        }
+
+        .phase-badge__icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
         }
 
         .header-right {
@@ -245,6 +291,8 @@
             align-items: center;
             gap: var(--space-2);
             font-size: var(--text-sm);
+            role: status;
+            aria-live: polite;
         }
 
         .status-dot {
@@ -252,6 +300,7 @@
             height: 8px;
             border-radius: 50%;
             display: inline-block;
+            transition: background-color var(--duration-normal) var(--ease-in-out);
         }
 
         .status-dot--connected {
@@ -297,15 +346,62 @@
             height: 8px;
             background-color: var(--color-bg-base);
             border-radius: var(--radius-full);
-            overflow: hidden;
+            overflow: visible;
             min-width: 300px;
+            position: relative;
         }
 
         .progress-bar__fill {
             height: 100%;
-            background-color: var(--status-running);
+            background: linear-gradient(
+                90deg,
+                var(--status-running) 0%,
+                var(--status-completed) 100%
+            );
             border-radius: var(--radius-full);
-            transition: width 0.5s ease-out;
+            transition: width var(--duration-slow) var(--ease-out);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar__shine {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent
+            );
+            animation: shine 2s ease-in-out infinite;
+        }
+
+        .progress-bar__markers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .progress-marker {
+            position: absolute;
+            top: -2px;
+            width: 2px;
+            height: 12px;
+            background-color: var(--color-border-strong);
+            transform: translateX(-50%);
+        }
+
+        .progress-marker--major {
+            height: 16px;
+            top: -4px;
+            width: 3px;
+            background-color: var(--color-text-secondary);
         }
 
         .progress-text {
@@ -365,6 +461,8 @@
             flex-direction: column;
             gap: var(--space-4);
             margin-bottom: var(--space-6);
+            aria-live: polite;
+            aria-atomic: false;
         }
 
         .agent-card {
@@ -373,12 +471,42 @@
             border-radius: var(--radius-lg);
             padding: var(--space-4);
             box-shadow: var(--shadow-md);
-            transition: all 0.3s ease;
+            transition: all var(--duration-normal) var(--ease-out);
+            cursor: pointer;
+            position: relative;
         }
 
         .agent-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg);
+        }
+
+        .agent-card:focus-within {
+            outline: 2px solid var(--color-interactive-default);
+            outline-offset: 2px;
+        }
+
+        .agent-card::after {
+            content: '';
+            position: absolute;
+            top: var(--space-4);
+            right: var(--space-4);
+            width: 20px;
+            height: 20px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 5l7 7-7 7' /%3E%3C/svg%3E");
+            background-size: contain;
+            opacity: 0;
+            transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+        }
+
+        .agent-card:hover::after {
+            opacity: 1;
+            transform: translateX(2px);
+        }
+
+        .agent-card[tabindex]:focus {
+            outline: 2px solid var(--color-interactive-default);
+            outline-offset: 2px;
         }
 
         .agent-card--pending {
@@ -421,6 +549,11 @@
             border-color: var(--status-escalated);
         }
 
+        .agent-card--skeleton {
+            pointer-events: none;
+            cursor: default;
+        }
+
         .agent-header {
             display: flex;
             align-items: center;
@@ -433,6 +566,19 @@
             height: 12px;
             border-radius: 50%;
             flex-shrink: 0;
+            position: relative;
+        }
+
+        .agent-card--running .agent-status-icon::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border: 2px solid var(--status-running);
+            border-radius: 50%;
+            animation: pulse-ring 2s ease-out infinite;
         }
 
         .agent-name {
@@ -460,6 +606,9 @@
             font-size: var(--text-sm);
             color: var(--color-text-secondary);
             margin-bottom: var(--space-2);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
         }
 
         .agent-dependency--satisfied {
@@ -467,6 +616,22 @@
         }
 
         .agent-dependency--waiting {
+            color: var(--color-warning);
+        }
+
+        .dependency-icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        .dependency-icon--satisfied {
+            color: var(--color-success);
+        }
+
+        .dependency-icon--waiting {
             color: var(--color-warning);
         }
 
@@ -478,6 +643,41 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: var(--space-2);
+            padding: var(--space-3);
+            background-color: var(--color-tooltip-bg);
+            border: 1px solid var(--color-tooltip-border);
+            border-radius: var(--radius-md);
+            color: var(--color-tooltip-text);
+            font-size: var(--text-sm);
+            white-space: normal;
+            max-width: 320px;
+            z-index: 1000;
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--duration-fast) var(--ease-out);
+        }
+
+        .agent-checkpoint:hover .tooltip {
+            opacity: 1;
+        }
+
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: var(--space-4);
+            border: 6px solid transparent;
+            border-top-color: var(--color-tooltip-bg);
         }
 
         .agent-progress-bar {
@@ -491,7 +691,7 @@
         .agent-progress-bar__fill {
             height: 100%;
             background: linear-gradient(90deg, var(--status-running), var(--status-completed));
-            transition: width 0.5s ease-out;
+            transition: width var(--duration-slow) var(--ease-out);
             border-radius: var(--radius-full);
         }
 
@@ -515,6 +715,49 @@
             border: 1px solid var(--color-border-default);
             border-radius: var(--radius-lg);
             padding: var(--space-4);
+            transition: all var(--duration-normal) var(--ease-out);
+        }
+
+        .dependency-graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-4);
+        }
+
+        .dependency-graph-header .section-header {
+            margin-bottom: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .dependency-graph-toggle {
+            background: none;
+            border: 1px solid var(--color-border-default);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            padding: var(--space-2);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+
+        .dependency-graph-toggle:hover {
+            background-color: var(--color-bg-hover);
+            border-color: var(--color-border-strong);
+            color: var(--color-text-primary);
+        }
+
+        .dependency-graph-toggle__icon {
+            width: 20px;
+            height: 20px;
+            transition: transform var(--duration-normal) var(--ease-out);
+        }
+
+        .dependency-graph-container.collapsed .dependency-graph-toggle__icon {
+            transform: rotate(-90deg);
         }
 
         .dependency-graph {
@@ -523,26 +766,67 @@
             line-height: var(--leading-relaxed);
             white-space: pre-wrap;
             word-break: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+            transition: max-height var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out);
+        }
+
+        .dependency-graph-container.collapsed .dependency-graph {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .dep-node {
+            display: inline;
+            padding: 1px 4px;
+            border-radius: var(--radius-sm);
+            transition: background-color var(--duration-fast) var(--ease-out);
+        }
+
+        .dep-node:hover {
+            background-color: var(--color-bg-hover);
+            cursor: pointer;
         }
 
         .dep-parent {
             color: var(--color-text-primary);
+            font-weight: var(--font-semibold);
         }
 
         .dep-tree {
             color: var(--color-text-tertiary);
+            opacity: 0.6;
         }
 
         .dep-completed {
             color: var(--color-success);
+            font-weight: var(--font-medium);
         }
 
         .dep-running {
             color: var(--status-running);
+            font-weight: var(--font-medium);
+        }
+
+        .dep-running::before {
+            content: '●';
+            margin-right: 4px;
+            animation: pulse-dot 1.5s ease-in-out infinite;
         }
 
         .dep-waiting {
             color: var(--color-text-secondary);
+        }
+
+        .dep-failed {
+            color: var(--status-failed);
+            font-weight: var(--font-medium);
+        }
+
+        .dep-icon {
+            display: inline-block;
+            margin-right: 4px;
         }
 
         /* Right Column - Message Stream */
@@ -572,22 +856,125 @@
             letter-spacing: 0.05em;
         }
 
-        .filter-controls {
+        /* Summary Statistics */
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            padding: var(--space-4);
+            background-color: var(--color-stats-bg);
+            border: 1px solid var(--color-stats-border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-4);
+        }
+
+        .summary-stat {
             display: flex;
+            align-items: center;
             gap: var(--space-3);
+            padding: var(--space-3);
+            background-color: var(--color-bg-elevated);
+            border-radius: var(--radius-md);
+            transition: all var(--duration-fast) var(--ease-out);
+        }
+
+        .summary-stat:hover {
+            background-color: var(--color-bg-hover);
+            transform: translateY(-1px);
+        }
+
+        .summary-stat__icon {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(59, 130, 246, 0.15);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .summary-stat__icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--color-stats-value);
+        }
+
+        .summary-stat__icon--error {
+            background-color: var(--status-failed-bg);
+        }
+
+        .summary-stat__icon--error svg {
+            color: var(--status-failed);
+        }
+
+        .summary-stat__icon--success {
+            background-color: var(--status-completed-bg);
+        }
+
+        .summary-stat__icon--success svg {
+            color: var(--status-completed);
+        }
+
+        .summary-stat__content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .summary-stat__value {
+            font-size: var(--text-xl);
+            font-weight: var(--font-bold);
+            color: var(--color-text-primary);
+            font-family: var(--font-mono);
+            line-height: 1;
+            margin-bottom: var(--space-1);
+        }
+
+        .summary-stat__value--error {
+            color: var(--status-failed);
+        }
+
+        .summary-stat__value--success {
+            color: var(--status-completed);
+        }
+
+        .summary-stat__label {
+            font-size: var(--text-xs);
+            color: var(--color-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: var(--font-semibold);
+        }
+
+        @media (max-width: 1280px) {
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Filter Controls */
+        .filter-controls {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: var(--space-4);
             padding-bottom: var(--space-3);
             border-bottom: 1px solid var(--color-border-subtle);
             margin-bottom: var(--space-3);
+            align-items: start;
         }
 
         .filter-label {
             font-size: var(--text-xs);
             color: var(--color-text-tertiary);
-            text-transform: uppercase;
             font-weight: var(--font-semibold);
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: var(--space-2);
+        }
+
+        .filter-label-text {
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .filter-select {
@@ -598,7 +985,7 @@
             font-size: var(--text-sm);
             color: var(--color-text-primary);
             cursor: pointer;
-            transition: border-color 0.2s ease;
+            transition: border-color var(--duration-fast) var(--ease-out);
         }
 
         .filter-select:hover {
@@ -609,6 +996,20 @@
             outline: none;
             border-color: var(--color-interactive-default);
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .filter-group .filter-label-text {
+            font-size: var(--text-xs);
+            color: var(--color-text-tertiary);
+            text-transform: uppercase;
+            font-weight: var(--font-semibold);
+            letter-spacing: 0.05em;
         }
 
         .filter-chips {
@@ -626,7 +1027,7 @@
             font-weight: var(--font-medium);
             color: var(--color-text-primary);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all var(--duration-fast) var(--ease-in-out));
             user-select: none;
         }
 
@@ -639,12 +1040,101 @@
             background-color: var(--color-interactive-default);
             border-color: var(--color-interactive-default);
             color: white;
+            animation: chip-activate var(--duration-normal) var(--ease-bounce);
+        }
+
+        .filter-reset {
+            background-color: transparent;
+            border: 1px solid var(--color-border-default);
+            border-radius: var(--radius-md);
+            padding: var(--space-1) var(--space-3);
+            font-size: var(--text-xs);
+            font-weight: var(--font-medium);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all var(--duration-fast) var(--ease-out));
+            align-self: flex-start;
+        }
+
+        .filter-reset:hover {
+            background-color: var(--color-bg-hover);
+            border-color: var(--color-border-strong);
+            color: var(--color-text-primary);
+        }
+
+        .filter-reset:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            background-color: var(--color-bg-overlay);
+            border: 1px solid var(--color-border-default);
+            border-radius: var(--radius-md);
+            padding: var(--space-2) var(--space-3) var(--space-2) var(--space-8);
+            font-size: var(--text-sm);
+            color: var(--color-text-primary);
+            font-family: var(--font-sans);
+            transition: border-color var(--duration-fast) var(--ease-out)), box-shadow var(--duration-fast) var(--ease-out));
+        }
+
+        .search-input::placeholder {
+            color: var(--color-text-tertiary);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--color-interactive-default);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .search-input__icon {
+            position: absolute;
+            left: var(--space-2);
+            width: 18px;
+            height: 18px;
+            color: var(--color-text-tertiary);
+            pointer-events: none;
+        }
+
+        .search-input__clear {
+            position: absolute;
+            right: var(--space-2);
+            background: none;
+            border: none;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            padding: var(--space-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            transition: all var(--duration-fast) var(--ease-out));
+        }
+
+        .search-input__clear svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .search-input__clear:hover {
+            background-color: var(--color-bg-hover);
+            color: var(--color-text-primary);
         }
 
         .messages-list {
             flex: 1;
             overflow-y: auto;
             padding-right: var(--space-3);
+            aria-live: polite;
+            aria-atomic: false;
         }
 
         .messages-list::-webkit-scrollbar {
@@ -665,6 +1155,36 @@
             background: var(--color-text-tertiary);
         }
 
+        .message-group {
+            margin-bottom: var(--space-6);
+        }
+
+        .message-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-group__header {
+            position: sticky;
+            top: 0;
+            background-color: var(--color-group-header-bg);
+            color: var(--color-group-header-text);
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-3);
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        .message-group__items {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
         .messages-empty {
             display: flex;
             flex-direction: column;
@@ -676,14 +1196,34 @@
             color: var(--color-text-tertiary);
         }
 
+        .messages-empty-icon {
+            width: 80px;
+            height: 80px;
+            background-color: var(--color-empty-icon-bg);
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: var(--space-6);
+        }
+
+        .messages-empty-icon svg {
+            width: 40px;
+            height: 40px;
+            color: var(--color-empty-icon);
+        }
+
         .messages-empty-title {
-            font-size: var(--text-base);
-            font-weight: var(--font-medium);
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--color-text-secondary);
             margin-bottom: var(--space-2);
         }
 
         .messages-empty-text {
             font-size: var(--text-sm);
+            color: var(--color-text-tertiary);
+            max-width: 300px;
         }
 
         .message-item {
@@ -691,9 +1231,8 @@
             border-left: 3px solid;
             border-radius: var(--radius-md);
             padding: var(--space-3);
-            margin-bottom: var(--space-2);
-            transition: all 0.2s ease;
-            animation: fade-in 0.3s ease-out;
+            transition: all var(--duration-fast) var(--ease-out));
+            animation: slide-in-up var(--duration-slow) var(--ease-out));
         }
 
         .message-item:hover {
@@ -805,7 +1344,7 @@
             color: var(--color-text-primary);
             cursor: pointer;
             box-shadow: var(--shadow-lg);
-            transition: all 0.2s ease;
+            transition: all var(--duration-fast) var(--ease-out));
             display: none;
         }
 
@@ -814,8 +1353,284 @@
             border-color: var(--color-border-strong);
         }
 
+        .auto-scroll-control:active {
+            transform: scale(0.98);
+        }
+
         .auto-scroll-control.visible {
             display: block;
+        }
+
+        /* Agent Detail Panel */
+        .detail-panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--color-panel-overlay);
+            z-index: 2000;
+            display: none;
+            opacity: 0;
+            transition: opacity var(--duration-normal) var(--ease-out));
+        }
+
+        .detail-panel-overlay.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        .detail-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 600px;
+            max-width: 90vw;
+            height: 100vh;
+            background-color: var(--color-panel-bg);
+            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform var(--duration-slow) var(--ease-out));
+            overflow: hidden;
+        }
+
+        .detail-panel-overlay.visible .detail-panel {
+            transform: translateX(0);
+        }
+
+        .detail-panel__header {
+            background-color: var(--color-bg-elevated);
+            border-bottom: 1px solid var(--color-border-default);
+            padding: var(--space-6);
+        }
+
+        .detail-panel__title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-2);
+        }
+
+        .detail-panel__title {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            color: var(--color-text-primary);
+        }
+
+        .detail-panel__close {
+            background: none;
+            border: none;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            padding: var(--space-2);
+            border-radius: var(--radius-md);
+            transition: all var(--duration-fast) var(--ease-out));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .detail-panel__close svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .detail-panel__close:hover {
+            background-color: var(--color-bg-hover);
+            color: var(--color-text-primary);
+        }
+
+        .detail-panel__subtitle {
+            font-size: var(--text-sm);
+            color: var(--color-text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        .detail-panel__content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-6);
+        }
+
+        .detail-panel__content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .detail-panel__content::-webkit-scrollbar-track {
+            background: var(--color-bg-base);
+            border-radius: var(--radius-full);
+        }
+
+        .detail-panel__content::-webkit-scrollbar-thumb {
+            background: var(--color-border-strong);
+            border-radius: var(--radius-full);
+        }
+
+        .detail-section {
+            margin-bottom: var(--space-8);
+        }
+
+        .detail-section__title {
+            font-size: var(--text-lg);
+            font-weight: var(--font-semibold);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-4);
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--color-border-subtle);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--color-border-subtle);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-row__label {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--color-text-secondary);
+        }
+
+        .detail-row__value {
+            font-size: var(--text-sm);
+            color: var(--color-text-primary);
+            font-family: var(--font-mono);
+            text-align: right;
+        }
+
+        .detail-row__value--highlight {
+            color: var(--color-interactive-default);
+            font-weight: var(--font-semibold);
+        }
+
+        .checkpoint-detail {
+            background-color: var(--color-bg-base);
+            border: 1px solid var(--color-border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            margin-top: var(--space-3);
+        }
+
+        .checkpoint-detail__summary {
+            font-size: var(--text-sm);
+            color: var(--color-text-primary);
+            line-height: var(--leading-relaxed);
+            margin-bottom: var(--space-4);
+        }
+
+        .checkpoint-detail__progress {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .checkpoint-detail__bar {
+            flex: 1;
+            height: 8px;
+            background-color: var(--color-bg-elevated);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+        }
+
+        .checkpoint-detail__bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--status-running), var(--status-completed));
+            border-radius: var(--radius-full);
+            transition: width var(--duration-slow) var(--ease-out));
+        }
+
+        .checkpoint-detail__percent {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--color-text-primary);
+        }
+
+        .panel-message-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .panel-message-item {
+            background-color: var(--color-bg-base);
+            border-left: 3px solid;
+            border-radius: var(--radius-md);
+            padding: var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        .panel-message-item__time {
+            font-size: var(--text-xs);
+            color: var(--color-text-tertiary);
+            font-family: var(--font-mono);
+            margin-bottom: var(--space-1);
+        }
+
+        .panel-message-item__content {
+            color: var(--color-text-primary);
+            line-height: var(--leading-normal);
+        }
+
+        .dependency-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .dependency-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2);
+            background-color: var(--color-bg-base);
+            border-radius: var(--radius-md);
+            font-size: var(--text-sm);
+        }
+
+        .dependency-item__icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .dependency-item__name {
+            flex: 1;
+            font-family: var(--font-mono);
+            color: var(--color-text-primary);
+        }
+
+        .dependency-item__status {
+            font-size: var(--text-xs);
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
+            font-weight: var(--font-medium);
+        }
+
+        .dependency-item__status--completed {
+            background-color: var(--status-completed-bg);
+            color: var(--status-completed);
+        }
+
+        .dependency-item__status--pending {
+            background-color: var(--status-pending-bg);
+            color: var(--status-pending);
+        }
+
+        .dependency-item__status--running {
+            background-color: var(--status-running-bg);
+            color: var(--status-running);
         }
 
         /* ============================================
@@ -868,6 +1683,28 @@
             }
         }
 
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.02);
+            }
+        }
+
         @keyframes shake {
             0%, 100% {
                 transform: translateX(0);
@@ -891,12 +1728,44 @@
             }
         }
 
+        @keyframes shine {
+            0% {
+                left: -100%;
+            }
+            100% {
+                left: 200%;
+            }
+        }
+
         @keyframes shimmer {
             0% {
                 background-position: -1000px 0;
             }
             100% {
                 background-position: 1000px 0;
+            }
+        }
+
+        @keyframes slide-in-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes chip-activate {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
             }
         }
 
@@ -924,7 +1793,7 @@
             display: none;
             align-items: center;
             gap: var(--space-4);
-            animation: fade-in 0.3s ease-out;
+            animation: fade-in var(--duration-normal) var(--ease-out));
         }
 
         .error-banner.visible {
@@ -973,7 +1842,7 @@
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            animation: fade-in 0.3s ease-out;
+            animation: fade-in var(--duration-normal) var(--ease-out));
         }
 
         .reconnecting-overlay.visible {
@@ -1045,6 +1914,10 @@
             .dashboard-label {
                 font-size: var(--text-base);
             }
+
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 767px) {
@@ -1095,10 +1968,15 @@
             <div class="header-title">
                 <span class="dashboard-label">APMAS Dashboard</span>
                 <span class="project-name" id="projectName">Loading...</span>
-                <span class="phase-badge" id="phaseBadge">Initializing</span>
+                <span class="phase-badge" id="phaseBadge" data-phase="Initializing">
+                    <svg class="phase-badge__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span class="phase-badge__text">Phase: Initializing</span>
+                </span>
             </div>
             <div class="header-right">
-                <div class="connection-status" id="connectionStatus">
+                <div class="connection-status" id="connectionStatus" role="status" aria-live="polite">
                     <span class="status-dot status-dot--disconnected"></span>
                     <span id="connectionText">Connecting...</span>
                 </div>
@@ -1114,7 +1992,10 @@
 
         <div class="progress-section">
             <div class="progress-bar">
-                <div class="progress-bar__fill" id="progressBarFill" style="width: 0%"></div>
+                <div class="progress-bar__fill" id="progressBarFill" style="width: 0%">
+                    <div class="progress-bar__shine"></div>
+                </div>
+                <div class="progress-bar__markers" id="progressMarkers"></div>
             </div>
             <span class="progress-text" id="progressText">0 of 0 agents complete (0%)</span>
         </div>
@@ -1135,13 +2016,20 @@
         <!-- Left Column: Agent Status -->
         <div class="agents-column">
             <h2 class="section-header">AGENT STATUS</h2>
-            <div class="agent-cards" id="agentCards">
+            <div class="agent-cards" id="agentCards" aria-live="polite" aria-atomic="false">
                 <!-- Dynamically populated -->
             </div>
 
             <!-- Dependency Graph -->
             <div class="dependency-graph-container">
-                <h3 class="section-header">DEPENDENCY GRAPH</h3>
+                <div class="dependency-graph-header">
+                    <h3 class="section-header">DEPENDENCY GRAPH</h3>
+                    <button class="dependency-graph-toggle" id="dependencyToggle" aria-label="Toggle graph visibility">
+                        <svg class="dependency-graph-toggle__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="dependency-graph" id="dependencyGraph">
                     <!-- Dynamically populated -->
                 </div>
@@ -1154,22 +2042,106 @@
                 <h2 class="messages-title">MESSAGE STREAM</h2>
             </div>
 
+            <!-- Summary Statistics -->
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <div class="summary-stat__icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                    </div>
+                    <div class="summary-stat__content">
+                        <div class="summary-stat__value" id="statTotalMessages">0</div>
+                        <div class="summary-stat__label">Messages</div>
+                    </div>
+                </div>
+
+                <div class="summary-stat">
+                    <div class="summary-stat__icon summary-stat__icon--error">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                        </svg>
+                    </div>
+                    <div class="summary-stat__content">
+                        <div class="summary-stat__value summary-stat__value--error" id="statErrors">0</div>
+                        <div class="summary-stat__label">Errors</div>
+                    </div>
+                </div>
+
+                <div class="summary-stat">
+                    <div class="summary-stat__icon summary-stat__icon--success">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="summary-stat__content">
+                        <div class="summary-stat__value summary-stat__value--success" id="statActive">0</div>
+                        <div class="summary-stat__label">Active</div>
+                    </div>
+                </div>
+
+                <div class="summary-stat">
+                    <div class="summary-stat__icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="summary-stat__content">
+                        <div class="summary-stat__value" id="statAvgTime">--</div>
+                        <div class="summary-stat__label">Avg Time</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filter Controls -->
             <div class="filter-controls">
                 <label class="filter-label">
-                    Filter:
+                    <span class="filter-label-text">Show from:</span>
                     <select class="filter-select" id="agentFilter" aria-label="Filter messages by agent">
                         <option value="">All Agents</option>
                     </select>
                 </label>
-                <div class="filter-chips" id="typeFilters">
-                    <!-- Dynamically populated -->
+
+                <div class="filter-group">
+                    <span class="filter-label-text">Search messages:</span>
+                    <div class="search-input-wrapper">
+                        <svg class="search-input__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                        <input
+                            type="text"
+                            class="search-input"
+                            id="messageSearch"
+                            placeholder="Filter by message content..."
+                            aria-label="Search message content"
+                        />
+                        <button class="search-input__clear" id="searchClear" aria-label="Clear search" style="display: none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label-text">Show message types:</span>
+                    <div class="filter-chips" id="typeFilters" role="group" aria-label="Message type filters">
+                        <!-- Dynamically populated chips -->
+                    </div>
+                    <button class="filter-reset" id="filterReset" aria-label="Clear all type filters" disabled>
+                        Clear All
+                    </button>
                 </div>
             </div>
 
             <!-- Messages List -->
-            <div class="messages-list" id="messagesList">
+            <div class="messages-list" id="messagesList" aria-live="polite" aria-atomic="false">
                 <div class="messages-empty">
+                    <div class="messages-empty-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+                        </svg>
+                    </div>
                     <div class="messages-empty-title">No messages yet</div>
                     <div class="messages-empty-text">Messages will appear here as agents communicate...</div>
                 </div>
@@ -1179,6 +2151,27 @@
             <button class="auto-scroll-control" id="autoScrollControl" aria-label="Toggle auto-scroll">⏸ Pause Auto-scroll</button>
         </div>
     </main>
+
+    <!-- Agent Detail Panel -->
+    <div class="detail-panel-overlay" id="detailPanelOverlay">
+        <div class="detail-panel" id="detailPanel" role="dialog" aria-labelledby="detailPanelTitle" aria-modal="true">
+            <div class="detail-panel__header">
+                <div class="detail-panel__title-row">
+                    <h2 class="detail-panel__title" id="detailPanelTitle">Agent Details</h2>
+                    <button class="detail-panel__close" id="detailPanelClose" aria-label="Close agent details">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="detail-panel__subtitle" id="detailPanelSubtitle"></div>
+            </div>
+
+            <div class="detail-panel__content" id="detailPanelContent">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
 
     <!-- Reconnecting Overlay -->
     <div class="reconnecting-overlay" id="reconnectingOverlay">
@@ -1199,9 +2192,10 @@
             messages: [],
             filters: {
                 agent: '',
-                types: new Set()
+                types: new Set(),
+                searchQuery: ''
             },
-            connection: 'connecting', // connecting, connected, reconnecting, disconnected
+            connection: 'connecting',
             autoScroll: true,
             startTime: null,
             eventSource: null
@@ -1246,12 +2240,27 @@
             });
         }
 
-        function getTimezoneOffset() {
-            const offset = new Date().getTimezoneOffset();
-            const hours = Math.abs(offset) / 60;
-            const minutes = Math.abs(offset) % 60;
-            const sign = offset <= 0 ? '+' : '-';
-            return `UTC${sign}${Math.floor(hours)}:${String(minutes).padStart(2, '0')}`;
+        function getTimezoneInfo() {
+            const date = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZoneName: 'long'
+            });
+
+            const parts = formatter.formatToParts(date);
+            const timeZonePart = parts.find(part => part.type === 'timeZoneName');
+            const timeZoneName = timeZonePart ? timeZonePart.value : 'Local Time';
+
+            const shortFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZoneName: 'short'
+            });
+            const shortParts = shortFormatter.formatToParts(date);
+            const shortTimeZonePart = shortParts.find(part => part.type === 'timeZoneName');
+            const shortName = shortTimeZonePart ? shortTimeZonePart.value : '';
+
+            return {
+                long: timeZoneName,
+                short: shortName
+            };
         }
 
         function truncate(str, length) {
@@ -1292,6 +2301,34 @@
             return colors[type] || 'info';
         }
 
+        function groupMessagesByTime(messages) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            const groups = {
+                today: [],
+                yesterday: [],
+                earlier: []
+            };
+
+            messages.forEach(msg => {
+                const msgDate = new Date(msg.timestamp);
+                const msgDay = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate());
+
+                if (msgDay.getTime() === today.getTime()) {
+                    groups.today.push(msg);
+                } else if (msgDay.getTime() === yesterday.getTime()) {
+                    groups.yesterday.push(msg);
+                } else {
+                    groups.earlier.push(msg);
+                }
+            });
+
+            return groups;
+        }
+
         // ============================================
         // API Functions
         // ============================================
@@ -1305,26 +2342,17 @@
                 state.project = data.project;
                 state.startTime = new Date(data.project.startedAt).getTime();
 
-                // Populate agents
                 data.agents.forEach(agent => {
                     state.agents.set(agent.role, agent);
                 });
 
-                // Populate messages
                 state.messages = data.recentMessages || [];
-
-                // Initialize filter options
                 updateAgentFilterOptions();
-
-                // Initial render
                 render();
-
-                // Start SSE connection
                 connectSSE();
             } catch (error) {
                 console.error('Failed to load initial state:', error);
                 showError('Failed to load dashboard', error.message);
-                // Retry after 3 seconds
                 setTimeout(loadInitialState, 3000);
             }
         }
@@ -1347,6 +2375,7 @@
                         state.agents.set(data.data.role, data.data);
                         renderAgentCard(data.data);
                         renderDependencyGraph();
+                        updateSummaryStats();
                     }
                 } catch (error) {
                     console.error('Error processing agent-update:', error);
@@ -1358,11 +2387,11 @@
                     const data = JSON.parse(event.data);
                     if (data.data) {
                         state.messages.unshift(data.data);
-                        // Keep only last 100 messages
                         if (state.messages.length > 100) {
                             state.messages.pop();
                         }
                         renderMessages();
+                        updateSummaryStats();
                     }
                 } catch (error) {
                     console.error('Error processing message:', error);
@@ -1372,7 +2401,6 @@
             state.eventSource.addEventListener('checkpoint', (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    // Checkpoint is included in agent-update
                 } catch (error) {
                     console.error('Error processing checkpoint:', error);
                 }
@@ -1380,7 +2408,6 @@
 
             state.eventSource.onerror = () => {
                 setConnectionStatus('reconnecting');
-                // Attempt to reconnect after 5 seconds
                 setTimeout(() => {
                     if (state.connection === 'reconnecting') {
                         connectSSE();
@@ -1397,33 +2424,55 @@
             renderAgentCards();
             renderDependencyGraph();
             renderMessages();
+            updateSummaryStats();
         }
 
         function renderHeader() {
-            // Project name and phase
             const projectElement = document.getElementById('projectName');
             const phaseElement = document.getElementById('phaseBadge');
 
             if (state.project) {
                 projectElement.textContent = state.project.name;
-                phaseElement.textContent = `Phase: ${state.project.phase}`;
+                phaseElement.setAttribute('data-phase', state.project.phase);
+                const phaseText = phaseElement.querySelector('.phase-badge__text');
+                if (phaseText) {
+                    phaseText.textContent = `Phase: ${state.project.phase}`;
+                }
 
-                // Started time
                 const startedElement = document.getElementById('startedAt');
                 startedElement.textContent = formatTimestamp(state.project.startedAt);
 
-                // Timezone
+                const tzInfo = getTimezoneInfo();
                 const tzElement = document.getElementById('timezoneInfo');
-                tzElement.textContent = `All times in ${getTimezoneOffset()}`;
+                tzElement.textContent = `All times in ${tzInfo.short} (${tzInfo.long})`;
+                tzElement.title = `Your local timezone: ${tzInfo.long}`;
 
-                // Progress
                 const completed = state.project.completedAgentCount;
                 const total = state.project.totalAgentCount;
                 const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
                 document.getElementById('progressBarFill').style.width = `${percentage}%`;
                 document.getElementById('progressText').textContent = `${completed} of ${total} agents complete (${percentage}%)`;
+
+                renderProgressMarkers();
             }
+        }
+
+        function renderProgressMarkers() {
+            const container = document.getElementById('progressMarkers');
+            container.innerHTML = '';
+
+            const totalAgents = state.project.totalAgentCount;
+            if (totalAgents <= 1) return;
+
+            const milestones = [25, 50, 75];
+            milestones.forEach(percent => {
+                const marker = document.createElement('div');
+                marker.className = 'progress-marker progress-marker--major';
+                marker.style.left = `${percent}%`;
+                marker.title = `${percent}% completion`;
+                container.appendChild(marker);
+            });
         }
 
         function updateHeaderTime() {
@@ -1461,6 +2510,9 @@
             const card = document.createElement('div');
             card.className = `agent-card ${getStatusClass(agent.status)}`;
             card.setAttribute('data-agent', agent.role);
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `View details for ${agent.role}`);
 
             const statusColor = getStatusColor(agent.status);
 
@@ -1478,7 +2530,6 @@
                 html += `<div class="agent-retry">Retry: ${agent.retryCount}</div>`;
             }
 
-            // Dependencies
             if (agent.dependencies && agent.dependencies.length > 0) {
                 const allMet = agent.dependencies.every(dep => {
                     const depAgent = state.agents.get(dep);
@@ -1486,20 +2537,44 @@
                 });
 
                 if (allMet) {
-                    html += `<div class="agent-dependency agent-dependency--satisfied">✓ All dependencies met</div>`;
+                    html += `
+                        <div class="agent-dependency agent-dependency--satisfied">
+                            <span aria-label="Completed">
+                                <svg class="dependency-icon dependency-icon--satisfied" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                            All dependencies met
+                        </div>
+                    `;
                 } else {
                     const unmet = agent.dependencies.filter(dep => {
                         const depAgent = state.agents.get(dep);
                         return !depAgent || depAgent.status !== 'Completed';
                     });
-                    html += `<div class="agent-dependency agent-dependency--waiting">⏳ Waiting: ${unmet.join(', ')}</div>`;
+                    html += `
+                        <div class="agent-dependency agent-dependency--waiting">
+                            <span aria-label="Waiting">
+                                <svg class="dependency-icon dependency-icon--waiting" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2" />
+                                    <circle cx="12" cy="12" r="10" />
+                                </svg>
+                            </span>
+                            Waiting: ${unmet.join(', ')}
+                        </div>
+                    `;
                 }
             }
 
-            // Progress bar (if checkpoint exists)
             if (agent.checkpoint) {
                 html += `
-                    <div class="agent-checkpoint">${truncate(agent.checkpoint.summary, 30)}</div>
+                    <div class="agent-checkpoint" aria-describedby="checkpoint-${agent.role}">
+                        ${truncate(agent.checkpoint.summary, 30)}
+                        <div class="tooltip" id="checkpoint-${agent.role}" role="tooltip">
+                            <strong>Checkpoint Summary:</strong><br>
+                            ${escapeHtml(agent.checkpoint.summary)}
+                        </div>
+                    </div>
                     <div class="agent-progress-bar">
                         <div class="agent-progress-bar__fill" style="width: ${agent.checkpoint.progress || 0}%"></div>
                     </div>
@@ -1512,33 +2587,43 @@
             }
 
             card.innerHTML = html;
+
+            card.addEventListener('click', () => {
+                openAgentDetailPanel(agent.role);
+            });
+
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openAgentDetailPanel(agent.role);
+                }
+            });
+
             return card;
         }
 
         function renderDependencyGraph() {
             const container = document.getElementById('dependencyGraph');
-            let text = '';
+            let html = '';
 
-            // Build dependency tree
             const visited = new Set();
             const processed = new Set();
 
             state.agents.forEach((agent) => {
                 if (!agent.dependencies || agent.dependencies.length === 0) {
                     if (!visited.has(agent.role)) {
-                        text += renderAgentNode(agent, 0, visited, processed);
+                        html += renderAgentNode(agent, 0, visited, processed);
                     }
                 }
             });
 
-            // Add agents with dependencies
             state.agents.forEach((agent) => {
                 if (!processed.has(agent.role)) {
-                    text += renderAgentNode(agent, 0, visited, processed);
+                    html += renderAgentNode(agent, 0, visited, processed);
                 }
             });
 
-            container.textContent = text.trim();
+            container.innerHTML = html.trim();
         }
 
         function renderAgentNode(agent, depth, visited, processed) {
@@ -1548,10 +2633,24 @@
             visited.add(agent.role);
 
             const indent = '  '.repeat(depth);
-            const statusIcon = agent.status === 'Completed' ? '✓' : '';
+
+            let statusClass = 'dep-waiting';
+            let statusIcon = '';
+
+            if (agent.status === 'Completed') {
+                statusClass = 'dep-completed';
+                statusIcon = '✓';
+            } else if (agent.status === 'Running') {
+                statusClass = 'dep-running';
+                statusIcon = '';
+            } else if (agent.status === 'Failed' || agent.status === 'TimedOut') {
+                statusClass = 'dep-failed';
+                statusIcon = '✗';
+            }
+
             const statusText = agent.status !== 'Completed' ? ` (${agent.status.toLowerCase()})` : '';
 
-            let output = indent + (statusIcon ? statusIcon + ' ' : '') + agent.role + statusText + '\n';
+            let output = `${indent}<span class="dep-node ${statusClass}">${statusIcon ? '<span class="dep-icon">' + statusIcon + '</span>' : ''}${agent.role}${statusText}</span>\n`;
 
             if (agent.dependencies && agent.dependencies.length > 0) {
                 agent.dependencies.forEach((dep, index) => {
@@ -1559,7 +2658,13 @@
                     if (depAgent && !visited.has(dep)) {
                         const isLast = index === agent.dependencies.length - 1;
                         const prefix = isLast ? '└─→ ' : '├─→ ';
-                        output += '  '.repeat(depth + 1) + prefix + dep + ` (${depAgent.status.toLowerCase()})\n`;
+
+                        let depStatusClass = 'dep-waiting';
+                        if (depAgent.status === 'Completed') depStatusClass = 'dep-completed';
+                        else if (depAgent.status === 'Running') depStatusClass = 'dep-running';
+                        else if (depAgent.status === 'Failed' || depAgent.status === 'TimedOut') depStatusClass = 'dep-failed';
+
+                        output += `${'  '.repeat(depth + 1)}<span class="dep-tree">${prefix}</span><span class="dep-node ${depStatusClass}">${dep}</span> <span class="dep-waiting">(${depAgent.status.toLowerCase()})</span>\n`;
                     }
                 });
             }
@@ -1585,16 +2690,22 @@
         function renderMessages() {
             const container = document.getElementById('messagesList');
 
-            // Filter messages
             const filtered = state.messages.filter(msg => {
                 const agentMatch = !state.filters.agent || msg.from === state.filters.agent;
                 const typeMatch = state.filters.types.size === 0 || state.filters.types.has(msg.type);
-                return agentMatch && typeMatch;
+                const searchMatch = !state.filters.searchQuery ||
+                                   msg.content.toLowerCase().includes(state.filters.searchQuery);
+                return agentMatch && typeMatch && searchMatch;
             });
 
             if (filtered.length === 0) {
                 container.innerHTML = `
                     <div class="messages-empty">
+                        <div class="messages-empty-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+                            </svg>
+                        </div>
                         <div class="messages-empty-title">No messages</div>
                         <div class="messages-empty-text">Try adjusting your filters...</div>
                     </div>
@@ -1602,15 +2713,51 @@
                 return;
             }
 
-            // Clear and rebuild
+            const groups = groupMessagesByTime(filtered);
             container.innerHTML = '';
 
-            filtered.forEach(msg => {
-                const item = createMessageItem(msg);
-                container.appendChild(item);
-            });
+            if (groups.today.length > 0) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'message-group';
+                groupDiv.innerHTML = `
+                    <div class="message-group__header">Today</div>
+                    <div class="message-group__items"></div>
+                `;
+                const itemsContainer = groupDiv.querySelector('.message-group__items');
+                groups.today.forEach(msg => {
+                    itemsContainer.appendChild(createMessageItem(msg));
+                });
+                container.appendChild(groupDiv);
+            }
 
-            // Auto-scroll if enabled
+            if (groups.yesterday.length > 0) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'message-group';
+                groupDiv.innerHTML = `
+                    <div class="message-group__header">Yesterday</div>
+                    <div class="message-group__items"></div>
+                `;
+                const itemsContainer = groupDiv.querySelector('.message-group__items');
+                groups.yesterday.forEach(msg => {
+                    itemsContainer.appendChild(createMessageItem(msg));
+                });
+                container.appendChild(groupDiv);
+            }
+
+            if (groups.earlier.length > 0) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'message-group';
+                groupDiv.innerHTML = `
+                    <div class="message-group__header">Earlier</div>
+                    <div class="message-group__items"></div>
+                `;
+                const itemsContainer = groupDiv.querySelector('.message-group__items');
+                groups.earlier.forEach(msg => {
+                    itemsContainer.appendChild(createMessageItem(msg));
+                });
+                container.appendChild(groupDiv);
+            }
+
             if (state.autoScroll) {
                 setTimeout(() => {
                     container.scrollTop = container.scrollHeight;
@@ -1635,10 +2782,169 @@
             return item;
         }
 
+        function updateSummaryStats() {
+            document.getElementById('statTotalMessages').textContent = state.messages.length;
+
+            const errorCount = state.messages.filter(m => m.type === 'Error').length;
+            document.getElementById('statErrors').textContent = errorCount;
+
+            const activeCount = Array.from(state.agents.values())
+                .filter(a => a.status === 'Running' || a.status === 'Spawning').length;
+            document.getElementById('statActive').textContent = activeCount;
+
+            const completedAgents = Array.from(state.agents.values())
+                .filter(a => a.status === 'Completed');
+
+            if (completedAgents.length > 0) {
+                const avgTime = completedAgents.reduce((sum, a) => sum + a.elapsedSeconds, 0) / completedAgents.length;
+                document.getElementById('statAvgTime').textContent = formatTime(Math.round(avgTime));
+            } else {
+                document.getElementById('statAvgTime').textContent = '--';
+            }
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // ============================================
+        // Agent Detail Panel Functions
+        // ============================================
+        function openAgentDetailPanel(agentRole) {
+            const agent = state.agents.get(agentRole);
+            if (!agent) return;
+
+            const overlay = document.getElementById('detailPanelOverlay');
+            const title = document.getElementById('detailPanelTitle');
+            const subtitle = document.getElementById('detailPanelSubtitle');
+            const content = document.getElementById('detailPanelContent');
+
+            title.textContent = agent.role;
+            subtitle.textContent = `Status: ${agent.status} • Elapsed: ${formatTime(agent.elapsedSeconds)}`;
+
+            content.innerHTML = renderAgentDetailContent(agent);
+
+            overlay.classList.add('visible');
+            document.getElementById('detailPanelClose').focus();
+        }
+
+        function closeAgentDetailPanel() {
+            const overlay = document.getElementById('detailPanelOverlay');
+            overlay.classList.remove('visible');
+        }
+
+        function renderAgentDetailContent(agent) {
+            let html = '';
+
+            html += `
+                <div class="detail-section">
+                    <h3 class="detail-section__title">Status Information</h3>
+                    <div class="detail-row">
+                        <span class="detail-row__label">Current Status</span>
+                        <span class="detail-row__value detail-row__value--highlight" style="color: ${getStatusColor(agent.status)}">${agent.status}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-row__label">Elapsed Time</span>
+                        <span class="detail-row__value">${formatTime(agent.elapsedSeconds)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-row__label">Retry Count</span>
+                        <span class="detail-row__value">${agent.retryCount}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-row__label">Last Updated</span>
+                        <span class="detail-row__value">${agent.lastUpdatedAt ? formatTimestamp(agent.lastUpdatedAt) : 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+
+            if (agent.dependencies && agent.dependencies.length > 0) {
+                html += `
+                    <div class="detail-section">
+                        <h3 class="detail-section__title">Dependencies</h3>
+                        <div class="dependency-list">
+                `;
+
+                agent.dependencies.forEach(dep => {
+                    const depAgent = state.agents.get(dep);
+                    const status = depAgent ? depAgent.status : 'Unknown';
+                    const statusClass = depAgent && depAgent.status === 'Completed' ? 'completed' :
+                                      depAgent && depAgent.status === 'Running' ? 'running' : 'pending';
+
+                    const icon = depAgent && depAgent.status === 'Completed'
+                        ? '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />'
+                        : '<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />';
+
+                    html += `
+                        <div class="dependency-item">
+                            <svg class="dependency-item__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                ${icon}
+                            </svg>
+                            <span class="dependency-item__name">${dep}</span>
+                            <span class="dependency-item__status dependency-item__status--${statusClass}">${status}</span>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (agent.checkpoint) {
+                html += `
+                    <div class="detail-section">
+                        <h3 class="detail-section__title">Progress Checkpoint</h3>
+                        <div class="checkpoint-detail">
+                            <div class="checkpoint-detail__summary">${escapeHtml(agent.checkpoint.summary)}</div>
+                            <div class="checkpoint-detail__progress">
+                                <div class="checkpoint-detail__bar">
+                                    <div class="checkpoint-detail__bar-fill" style="width: ${agent.checkpoint.progress || 0}%"></div>
+                                </div>
+                                <span class="checkpoint-detail__percent">${agent.checkpoint.progress || 0}%</span>
+                            </div>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-row__label">Checkpoint Created</span>
+                            <span class="detail-row__value">${formatTimestamp(agent.checkpoint.timestamp)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const agentMessages = state.messages.filter(m => m.from === agent.role || m.to === agent.role).slice(0, 10);
+            if (agentMessages.length > 0) {
+                html += `
+                    <div class="detail-section">
+                        <h3 class="detail-section__title">Recent Messages (Last 10)</h3>
+                        <div class="panel-message-list">
+                `;
+
+                agentMessages.forEach(msg => {
+                    const typeColor = getMessageTypeColor(msg.type);
+                    const borderColor = `var(--msg-${typeColor})`;
+
+                    html += `
+                        <div class="panel-message-item" style="border-left-color: ${borderColor}">
+                            <div class="panel-message-item__time">
+                                ${formatTimeOnly(msg.timestamp)} • ${msg.type}
+                                ${msg.to ? ` → ${msg.to}` : ''}
+                            </div>
+                            <div class="panel-message-item__content">${escapeHtml(msg.content)}</div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
         }
 
         // ============================================
@@ -1683,7 +2989,6 @@
             textEl.textContent = message;
             banner.classList.add('visible');
 
-            // Auto-dismiss after 10 seconds
             setTimeout(() => {
                 banner.classList.remove('visible');
             }, 10000);
@@ -1719,10 +3024,48 @@
                     state.filters.types.add(type);
                     chip.classList.add('filter-chip--active');
                 }
+
+                const resetButton = document.getElementById('filterReset');
+                resetButton.disabled = state.filters.types.size === 0;
+
                 renderMessages();
             });
 
             chipContainer.appendChild(chip);
+        });
+
+        // Message search
+        document.getElementById('messageSearch').addEventListener('input', (e) => {
+            state.filters.searchQuery = e.target.value.toLowerCase().trim();
+
+            const clearButton = document.getElementById('searchClear');
+            if (state.filters.searchQuery) {
+                clearButton.style.display = 'flex';
+            } else {
+                clearButton.style.display = 'none';
+            }
+
+            renderMessages();
+        });
+
+        document.getElementById('searchClear').addEventListener('click', () => {
+            document.getElementById('messageSearch').value = '';
+            state.filters.searchQuery = '';
+            document.getElementById('searchClear').style.display = 'none';
+            renderMessages();
+        });
+
+        // Clear all type filters
+        document.getElementById('filterReset').addEventListener('click', () => {
+            state.filters.types.clear();
+
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('filter-chip--active');
+            });
+
+            document.getElementById('filterReset').disabled = true;
+
+            renderMessages();
         });
 
         // Auto-scroll control
@@ -1744,6 +3087,35 @@
             state.autoScroll = true;
             messagesList.scrollTop = messagesList.scrollHeight;
             autoScrollButton.classList.remove('visible');
+        });
+
+        // Detail panel close
+        document.getElementById('detailPanelClose').addEventListener('click', closeAgentDetailPanel);
+
+        document.getElementById('detailPanelOverlay').addEventListener('click', (e) => {
+            if (e.target.id === 'detailPanelOverlay') {
+                closeAgentDetailPanel();
+            }
+        });
+
+        // Keyboard: Escape to close detail panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('detailPanelOverlay');
+                if (overlay.classList.contains('visible')) {
+                    closeAgentDetailPanel();
+                }
+            }
+        });
+
+        // Dependency graph toggle
+        document.getElementById('dependencyToggle').addEventListener('click', () => {
+            const container = document.querySelector('.dependency-graph-container');
+            container.classList.toggle('collapsed');
+
+            const button = document.getElementById('dependencyToggle');
+            const isCollapsed = container.classList.contains('collapsed');
+            button.setAttribute('aria-label', isCollapsed ? 'Expand dependency graph' : 'Collapse dependency graph');
         });
 
         // Update elapsed time every second
