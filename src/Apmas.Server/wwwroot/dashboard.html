@@ -9,27 +9,27 @@
            1. CSS Custom Properties (Design Tokens)
            ============================================ */
         :root {
-            /* Background layers */
-            --color-bg-base: #0f1419;
-            --color-bg-elevated: #1a1f28;
-            --color-bg-overlay: #252b36;
-            --color-bg-hover: #2a3140;
+            /* Background layers - light theme */
+            --color-bg-base: #F7F5F3;
+            --color-bg-elevated: #FFFFFF;
+            --color-bg-overlay: #F9F8F6;
+            --color-bg-hover: #F3F1ED;
 
-            /* Text hierarchy */
-            --color-text-primary: #e3e8ef;
-            --color-text-secondary: #9ca3af;
-            --color-text-tertiary: #8b95a5;
-            --color-text-disabled: #4b5563;
+            /* Text hierarchy - dark charcoal */
+            --color-text-primary: #2D2A32;
+            --color-text-secondary: #5C5867;
+            --color-text-tertiary: #8B8698;
+            --color-text-disabled: #B0ABC4;
 
             /* Borders & dividers */
-            --color-border-default: #2d3748;
-            --color-border-subtle: #1f2937;
-            --color-border-strong: #4a5568;
+            --color-border-default: rgba(45, 42, 50, 0.1);
+            --color-border-subtle: rgba(45, 42, 50, 0.08);
+            --color-border-strong: rgba(45, 42, 50, 0.2);
 
-            /* Interactive elements */
-            --color-interactive-default: #3b82f6;
-            --color-interactive-hover: #60a5fa;
-            --color-interactive-active: #2563eb;
+            /* Interactive elements - purple-pink accents */
+            --color-interactive-default: #A855F7;
+            --color-interactive-hover: #C084FC;
+            --color-interactive-active: #9333EA;
 
             /* Agent status indicators */
             --status-pending: #6b7280;
@@ -37,7 +37,7 @@
             --status-spawning: #06b6d4;
             --status-running: #10b981;
             --status-paused: #f59e0b;
-            --status-completed: #059669;
+            --status-completed: #3B82F6;
             --status-failed: #ef4444;
             --status-timedout: #dc2626;
             --status-escalated: #8b5cf6;
@@ -48,7 +48,7 @@
             --status-spawning-bg: rgba(6, 182, 212, 0.15);
             --status-running-bg: rgba(16, 185, 129, 0.15);
             --status-paused-bg: rgba(245, 158, 11, 0.15);
-            --status-completed-bg: rgba(5, 150, 105, 0.15);
+            --status-completed-bg: rgba(59, 130, 246, 0.15);
             --status-failed-bg: rgba(239, 68, 68, 0.15);
             --status-timedout-bg: rgba(220, 38, 38, 0.15);
             --status-escalated-bg: rgba(139, 92, 246, 0.15);
@@ -56,7 +56,7 @@
             /* Message type colors */
             --msg-info: #3b82f6;
             --msg-progress: #10b981;
-            --msg-done: #059669;
+            --msg-done: #3B82F6;
             --msg-error: #ef4444;
             --msg-help: #f59e0b;
             --msg-heartbeat: #6b7280;
@@ -79,21 +79,21 @@
             --connection-reconnecting: #f59e0b;
             --connection-disconnected: #ef4444;
 
-            /* Enhanced tokens for new features */
-            --color-header-accent-start: #1e3a5f;
-            --color-header-accent-end: #0f1419;
-            --color-panel-bg: #1a1f28;
-            --color-panel-overlay: rgba(0, 0, 0, 0.85);
-            --color-stats-bg: #252b36;
-            --color-stats-border: #2d3748;
-            --color-stats-value: #3b82f6;
-            --color-group-header-bg: #1a1f28;
-            --color-group-header-text: #9ca3af;
-            --color-empty-icon: #4a5568;
-            --color-empty-icon-bg: rgba(59, 130, 246, 0.1);
-            --color-tooltip-bg: #2d3748;
-            --color-tooltip-text: #e3e8ef;
-            --color-tooltip-border: #4a5568;
+            /* Enhanced tokens for new features - light theme */
+            --color-header-accent-start: #A855F7;
+            --color-header-accent-end: #EC4899;
+            --color-panel-bg: #FFFFFF;
+            --color-panel-overlay: rgba(255, 255, 255, 0.95);
+            --color-stats-bg: #F9F8F6;
+            --color-stats-border: rgba(45, 42, 50, 0.1);
+            --color-stats-value: #A855F7;
+            --color-group-header-bg: #EFEDE9;
+            --color-group-header-text: #5C5867;
+            --color-empty-icon: #B0ABC4;
+            --color-empty-icon-bg: rgba(168, 85, 247, 0.1);
+            --color-tooltip-bg: #2D2A32;
+            --color-tooltip-text: #FFFFFF;
+            --color-tooltip-border: #5C5867;
 
             /* Font families */
             --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -138,11 +138,11 @@
             --radius-xl: 0.75rem;
             --radius-full: 9999px;
 
-            /* Shadows */
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
-            --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.3);
+            /* Shadows - adjusted for light theme */
+            --shadow-sm: 0 1px 2px 0 rgba(45, 42, 50, 0.08);
+            --shadow-md: 0 4px 12px -2px rgba(45, 42, 50, 0.08), 0 2px 4px -1px rgba(45, 42, 50, 0.05);
+            --shadow-lg: 0 10px 25px -5px rgba(45, 42, 50, 0.1), 0 4px 6px -2px rgba(45, 42, 50, 0.05);
+            --shadow-glow: 0 0 30px rgba(168, 85, 247, 0.25);
 
             /* Animation durations */
             --duration-fast: 0.15s;
@@ -219,16 +219,17 @@
         /* Header */
         header {
             background: linear-gradient(
-                180deg,
+                135deg,
                 var(--color-header-accent-start) 0%,
-                var(--color-bg-elevated) 100%
+                var(--color-header-accent-end) 100%
             );
-            border-bottom: 1px solid var(--color-border-default);
+            border-bottom: 1px solid rgba(236, 72, 153, 0.15);
             padding: var(--space-5) var(--space-6);
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15), 0 2px 4px rgba(236, 72, 153, 0.1);
+            color: white;
         }
 
         .header-top {
@@ -247,13 +248,13 @@
         .dashboard-label {
             font-size: var(--text-xl);
             font-weight: var(--font-semibold);
-            color: var(--color-text-secondary);
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .project-name {
             font-size: var(--text-2xl);
             font-weight: var(--font-bold);
-            color: var(--color-text-primary);
+            color: #FFFFFF;
         }
 
         .phase-badge {
@@ -325,13 +326,13 @@
 
         .time-display {
             font-size: var(--text-sm);
-            color: var(--color-text-secondary);
+            color: rgba(255, 255, 255, 0.85);
             font-family: var(--font-mono);
         }
 
         .timezone-info {
             font-size: var(--text-xs);
-            color: var(--color-text-tertiary);
+            color: rgba(255, 255, 255, 0.7);
             font-family: var(--font-mono);
         }
 
@@ -344,7 +345,7 @@
         .progress-bar {
             flex: 1;
             height: 8px;
-            background-color: var(--color-bg-base);
+            background-color: rgba(255, 255, 255, 0.2);
             border-radius: var(--radius-full);
             overflow: visible;
             min-width: 300px;
@@ -355,8 +356,8 @@
             height: 100%;
             background: linear-gradient(
                 90deg,
-                var(--status-running) 0%,
-                var(--status-completed) 100%
+                #EC4899 0%,
+                #A855F7 100%
             );
             border-radius: var(--radius-full);
             transition: width var(--duration-slow) var(--ease-out);
@@ -393,7 +394,7 @@
             top: -2px;
             width: 2px;
             height: 12px;
-            background-color: var(--color-border-strong);
+            background-color: rgba(255, 255, 255, 0.5);
             transform: translateX(-50%);
         }
 
@@ -401,12 +402,12 @@
             height: 16px;
             top: -4px;
             width: 3px;
-            background-color: var(--color-text-secondary);
+            background-color: rgba(255, 255, 255, 0.8);
         }
 
         .progress-text {
             font-size: var(--text-sm);
-            color: var(--color-text-secondary);
+            color: rgba(255, 255, 255, 0.85);
             white-space: nowrap;
         }
 
@@ -432,17 +433,17 @@
         }
 
         .agents-column::-webkit-scrollbar-track {
-            background: var(--color-bg-base);
+            background: transparent;
             border-radius: var(--radius-full);
         }
 
         .agents-column::-webkit-scrollbar-thumb {
-            background: var(--color-border-strong);
+            background: rgba(168, 85, 247, 0.3);
             border-radius: var(--radius-full);
         }
 
         .agents-column::-webkit-scrollbar-thumb:hover {
-            background: var(--color-text-tertiary);
+            background: rgba(168, 85, 247, 0.5);
         }
 
         .section-header {
@@ -468,7 +469,7 @@
         .agent-card {
             background-color: var(--color-bg-elevated);
             border: 2px solid;
-            border-radius: var(--radius-lg);
+            border-radius: 0.75rem;
             padding: var(--space-4);
             box-shadow: var(--shadow-md);
             transition: all var(--duration-normal) var(--ease-out);
@@ -477,8 +478,8 @@
         }
 
         .agent-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15), var(--shadow-lg);
         }
 
         .agent-card:focus-within {
@@ -713,9 +714,10 @@
         .dependency-graph-container {
             background-color: var(--color-bg-elevated);
             border: 1px solid var(--color-border-default);
-            border-radius: var(--radius-lg);
+            border-radius: 0.75rem;
             padding: var(--space-4);
             transition: all var(--duration-normal) var(--ease-out);
+            box-shadow: var(--shadow-sm);
         }
 
         .dependency-graph-header {
@@ -835,9 +837,10 @@
             flex-direction: column;
             background-color: var(--color-bg-elevated);
             border: 1px solid var(--color-border-default);
-            border-radius: var(--radius-lg);
+            border-radius: 0.75rem;
             padding: var(--space-4);
             overflow: hidden;
+            box-shadow: var(--shadow-md);
         }
 
         .messages-header {
@@ -862,9 +865,9 @@
             grid-template-columns: repeat(4, 1fr);
             gap: var(--space-4);
             padding: var(--space-4);
-            background-color: var(--color-stats-bg);
-            border: 1px solid var(--color-stats-border);
-            border-radius: var(--radius-lg);
+            background-color: transparent;
+            border: none;
+            border-radius: 0;
             margin-bottom: var(--space-4);
         }
 
@@ -872,22 +875,26 @@
             display: flex;
             align-items: center;
             gap: var(--space-3);
-            padding: var(--space-3);
+            padding: var(--space-4);
             background-color: var(--color-bg-elevated);
-            border-radius: var(--radius-md);
+            border-radius: 0.75rem;
             transition: all var(--duration-fast) var(--ease-out);
+            border: 1px solid var(--color-border-default);
+            box-shadow: var(--shadow-sm);
         }
 
         .summary-stat:hover {
-            background-color: var(--color-bg-hover);
-            transform: translateY(-1px);
+            background-color: var(--color-bg-overlay);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.1);
+            border-color: rgba(168, 85, 247, 0.2);
         }
 
         .summary-stat__icon {
             width: 40px;
             height: 40px;
-            background-color: rgba(59, 130, 246, 0.15);
-            border-radius: var(--radius-md);
+            background-color: rgba(168, 85, 247, 0.1);
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -995,7 +1002,7 @@
         .filter-select:focus {
             outline: none;
             border-color: var(--color-interactive-default);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
         }
 
         .filter-group {
@@ -1092,7 +1099,7 @@
         .search-input:focus {
             outline: none;
             border-color: var(--color-interactive-default);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
         }
 
         .search-input__icon {
@@ -1142,17 +1149,17 @@
         }
 
         .messages-list::-webkit-scrollbar-track {
-            background: var(--color-bg-base);
+            background: transparent;
             border-radius: var(--radius-full);
         }
 
         .messages-list::-webkit-scrollbar-thumb {
-            background: var(--color-border-strong);
+            background: rgba(168, 85, 247, 0.3);
             border-radius: var(--radius-full);
         }
 
         .messages-list::-webkit-scrollbar-thumb:hover {
-            background: var(--color-text-tertiary);
+            background: rgba(168, 85, 247, 0.5);
         }
 
         .message-group {
@@ -1166,14 +1173,14 @@
         .message-group__header {
             position: sticky;
             top: 0;
-            background-color: var(--color-group-header-bg);
+            background-color: rgba(239, 237, 233, 0.8);
             color: var(--color-group-header-text);
             font-size: var(--text-xs);
             font-weight: var(--font-semibold);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             padding: var(--space-2) var(--space-3);
-            border-radius: var(--radius-md);
+            border-radius: 0.5rem;
             margin-bottom: var(--space-3);
             z-index: 10;
             backdrop-filter: blur(8px);
@@ -1227,16 +1234,16 @@
         }
 
         .message-item {
-            background-color: var(--color-bg-base);
+            background-color: #F9F8F6;
             border-left: 3px solid;
-            border-radius: var(--radius-md);
+            border-radius: 0.5rem;
             padding: var(--space-3);
             transition: all var(--duration-fast) var(--ease-out));
             animation: slide-in-up var(--duration-slow) var(--ease-out));
         }
 
         .message-item:hover {
-            background-color: var(--color-bg-hover);
+            background-color: #F3F1ED;
         }
 
         .message-item--info {
@@ -1336,21 +1343,21 @@
             position: absolute;
             bottom: var(--space-6);
             right: var(--space-6);
-            background-color: var(--color-bg-overlay);
-            border: 1px solid var(--color-border-default);
+            background-color: var(--color-interactive-default);
+            border: none;
             border-radius: var(--radius-full);
             padding: var(--space-2) var(--space-4);
             font-size: var(--text-sm);
-            color: var(--color-text-primary);
+            color: white;
             cursor: pointer;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
             transition: all var(--duration-fast) var(--ease-out));
             display: none;
         }
 
         .auto-scroll-control:hover {
-            background-color: var(--color-bg-hover);
-            border-color: var(--color-border-strong);
+            background-color: var(--color-interactive-hover);
+            box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4);
         }
 
         .auto-scroll-control:active {
@@ -1388,7 +1395,7 @@
             max-width: 90vw;
             height: 100vh;
             background-color: var(--color-panel-bg);
-            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+            box-shadow: -4px 0 24px rgba(45, 42, 50, 0.15);
             display: flex;
             flex-direction: column;
             transform: translateX(100%);
@@ -1514,9 +1521,9 @@
         }
 
         .checkpoint-detail {
-            background-color: var(--color-bg-base);
+            background-color: #F9F8F6;
             border: 1px solid var(--color-border-default);
-            border-radius: var(--radius-lg);
+            border-radius: 0.5rem;
             padding: var(--space-4);
             margin-top: var(--space-3);
         }
@@ -1564,9 +1571,9 @@
         }
 
         .panel-message-item {
-            background-color: var(--color-bg-base);
+            background-color: #F9F8F6;
             border-left: 3px solid;
-            border-radius: var(--radius-md);
+            border-radius: 0.5rem;
             padding: var(--space-3);
             font-size: var(--text-sm);
         }
@@ -1594,8 +1601,8 @@
             align-items: center;
             gap: var(--space-2);
             padding: var(--space-2);
-            background-color: var(--color-bg-base);
-            border-radius: var(--radius-md);
+            background-color: #F9F8F6;
+            border-radius: 0.5rem;
             font-size: var(--text-sm);
         }
 
@@ -1667,10 +1674,10 @@
            ============================================ */
         @keyframes pulse-glow {
             0%, 100% {
-                box-shadow: var(--shadow-md), 0 0 0 0 rgba(16, 185, 129, 0.4);
+                box-shadow: var(--shadow-md), 0 0 0 0 rgba(168, 85, 247, 0.4);
             }
             50% {
-                box-shadow: var(--shadow-md), 0 0 0 8px rgba(16, 185, 129, 0);
+                box-shadow: var(--shadow-md), 0 0 0 8px rgba(168, 85, 247, 0);
             }
         }
 
@@ -1958,6 +1965,48 @@
         *:focus-visible {
             outline: 2px solid var(--color-interactive-default);
             outline-offset: 2px;
+        }
+
+        /* ============================================
+           10. Discord-style Decorative Elements
+           ============================================ */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -300px;
+            right: 10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%);
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -300px;
+            left: 5%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.25) 0%, transparent 70%);
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Ensure content layers above glow */
+        header {
+            position: relative;
+            z-index: 100;
+        }
+
+        main {
+            position: relative;
+            z-index: 10;
         }
     </style>
 </head>
@@ -2695,7 +2744,7 @@
             const container = document.getElementById('messagesList');
 
             const filtered = state.messages.filter(msg => {
-                const agentMatch = !state.filters.agent || msg.from === state.filters.agent;
+                const agentMatch = !state.filters.agent || msg.from === state.filters.agent || msg.to === state.filters.agent;
                 const typeMatch = state.filters.types.size === 0 || state.filters.types.has(msg.type);
                 const searchMatch = !state.filters.searchQuery ||
                                    msg.content.toLowerCase().includes(state.filters.searchQuery);
