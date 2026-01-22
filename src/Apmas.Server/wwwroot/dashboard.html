@@ -2205,6 +2205,10 @@
         // Utility Functions
         // ============================================
         function formatTime(seconds) {
+            // Handle invalid/negative values (e.g., clock skew)
+            if (seconds == null || isNaN(seconds) || seconds < 0) return '0s';
+
+            seconds = Math.floor(seconds);
             if (seconds < 60) return `${seconds}s`;
             if (seconds < 3600) {
                 const m = Math.floor(seconds / 60);
