@@ -2760,7 +2760,7 @@
 
             if (state.autoScroll) {
                 setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
+                    container.scrollTop = 0;
                 }, 0);
             }
         }
@@ -3073,8 +3073,8 @@
         const autoScrollButton = document.getElementById('autoScrollControl');
 
         messagesList.addEventListener('scroll', () => {
-            const isAtBottom = messagesList.scrollHeight - messagesList.scrollTop - messagesList.clientHeight < 50;
-            state.autoScroll = isAtBottom;
+            const isAtTop = messagesList.scrollTop < 50;
+            state.autoScroll = isAtTop;
 
             if (state.autoScroll) {
                 autoScrollButton.classList.remove('visible');
@@ -3085,7 +3085,7 @@
 
         autoScrollButton.addEventListener('click', () => {
             state.autoScroll = true;
-            messagesList.scrollTop = messagesList.scrollHeight;
+            messagesList.scrollTop = 0;
             autoScrollButton.classList.remove('visible');
         });
 
