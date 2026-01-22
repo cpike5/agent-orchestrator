@@ -80,8 +80,8 @@
             --connection-disconnected: #ef4444;
 
             /* Enhanced tokens for new features - light theme */
-            --color-header-accent-start: #A855F7;
-            --color-header-accent-end: #EC4899;
+            --color-header-accent-start: #7C3AED;
+            --color-header-accent-end: #9F7AEA;
             --color-panel-bg: #FFFFFF;
             --color-panel-overlay: rgba(255, 255, 255, 0.95);
             --color-stats-bg: #F9F8F6;
@@ -218,17 +218,13 @@
 
         /* Header */
         header {
-            background: linear-gradient(
-                135deg,
-                var(--color-header-accent-start) 0%,
-                var(--color-header-accent-end) 100%
-            );
-            border-bottom: 1px solid rgba(236, 72, 153, 0.15);
+            background: var(--color-header-accent-start);
+            border-bottom: 1px solid rgba(124, 58, 237, 0.2);
             padding: var(--space-5) var(--space-6);
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15), 0 2px 4px rgba(236, 72, 153, 0.1);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.12);
             color: white;
         }
 
@@ -356,8 +352,8 @@
             height: 100%;
             background: linear-gradient(
                 90deg,
-                #EC4899 0%,
-                #A855F7 100%
+                var(--color-header-accent-end) 0%,
+                var(--color-header-accent-start) 100%
             );
             border-radius: var(--radius-full);
             transition: width var(--duration-slow) var(--ease-out);
