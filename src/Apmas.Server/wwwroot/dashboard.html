@@ -2285,7 +2285,7 @@
         }
 
         function getStatusClass(status) {
-            return `agent-card--${status.toLowerCase()}`;
+            return `agent-card--${(status || 'pending').toLowerCase()}`;
         }
 
         function getMessageTypeColor(type) {
@@ -2648,7 +2648,7 @@
                 statusIcon = '✗';
             }
 
-            const statusText = agent.status !== 'Completed' ? ` (${agent.status.toLowerCase()})` : '';
+            const statusText = agent.status && agent.status !== 'Completed' ? ` (${agent.status.toLowerCase()})` : '';
 
             let output = `${indent}<span class="dep-node ${statusClass}">${statusIcon ? '<span class="dep-icon">' + statusIcon + '</span>' : ''}${agent.role}${statusText}</span>\n`;
 
@@ -2664,7 +2664,7 @@
                         else if (depAgent.status === 'Running') depStatusClass = 'dep-running';
                         else if (depAgent.status === 'Failed' || depAgent.status === 'TimedOut') depStatusClass = 'dep-failed';
 
-                        output += `${'  '.repeat(depth + 1)}<span class="dep-tree">${prefix}</span><span class="dep-node ${depStatusClass}">${dep}</span> <span class="dep-waiting">(${depAgent.status.toLowerCase()})</span>\n`;
+                        output += `${'  '.repeat(depth + 1)}<span class="dep-tree">${prefix}</span><span class="dep-node ${depStatusClass}">${dep}</span> <span class="dep-waiting">(${(depAgent.status || 'pending').toLowerCase()})</span>\n`;
                     }
                 });
             }
