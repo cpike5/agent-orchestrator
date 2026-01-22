@@ -22,9 +22,12 @@ The key architectural insight: **agents cannot self-coordinate reliably**. An ex
 │  │  Service  │  │  Manager  │  │   Bus     │  │  Spawner  │    │
 │  └───────────┘  └───────────┘  └───────────┘  └───────────┘    │
 │                         MCP Tool Handlers                       │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           HTTP/SSE Transport (localhost:5050)            │   │
+│  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
-              │                 │                 │
-              ▼                 ▼                 ▼
+              │ HTTP/SSE          │ HTTP/SSE          │ HTTP/SSE
+              ▼                   ▼                   ▼
     ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
     │  Claude Agent   │ │  Claude Agent   │ │  Claude Agent   │
     │   (Architect)   │ │   (Developer)   │ │   (Reviewer)    │
@@ -56,6 +59,10 @@ Edit `src/Apmas.Server/appsettings.json`:
   "Apmas": {
     "ProjectName": "my-project",
     "WorkingDirectory": "C:/projects/my-project",
+    "HttpTransport": {
+      "Port": 5050,
+      "Host": "127.0.0.1"
+    },
     "Agents": {
       "Roster": [
         { "Role": "architect", "SubagentType": "systems-architect", "Dependencies": [] },
@@ -74,10 +81,13 @@ dotnet run --project src/Apmas.Server
 
 ## Features
 
+- **HTTP/SSE Transport** - Agents connect via MCP HTTP protocol with Server-Sent Events
 - **Dependency Resolution** - Agents only start when their dependencies complete
-- **Heartbeat Monitoring** - Detects unresponsive agents
+- **Heartbeat Monitoring** - Detects unresponsive agents based on configurable timeouts
 - **Automatic Recovery** - Restarts failed agents with checkpoint context
-- **Human Escalation** - Notifies humans after repeated failures
+- **Progressive Retry** - Checkpoint recovery, scope reduction, then human escalation
+- **Graceful Shutdown** - Closes stdin, waits timeout, force kills if needed
+- **Notifications** - Console, Email, or Slack escalation notifications
 - **Structured Logging** - Serilog with Seq integration
 
 ## MCP Tools
@@ -119,18 +129,20 @@ dotnet watch --project src/Apmas.Server
 
 ```
 src/Apmas.Server/
-├── Configuration/     # Options classes
+├── Configuration/     # ApmasOptions, TimeoutOptions, HttpTransportOptions, etc.
 ├── Core/
-│   ├── Services/      # SupervisorService, AgentStateManager, MessageBus
-│   ├── Models/        # ProjectState, AgentState, Checkpoint
-│   └── Enums/         # AgentStatus, MessageType
+│   ├── Services/      # SupervisorService, AgentStateManager, MessageBus, HeartbeatMonitor
+│   ├── Models/        # ProjectState, AgentState, Checkpoint, WorkItem
+│   └── Enums/         # AgentStatus, MessageType, ProjectPhase
 ├── Mcp/
 │   ├── Tools/         # MCP tool handlers
-│   └── Resources/     # MCP resource handlers
+│   ├── Resources/     # MCP resource handlers
+│   └── Http/          # HttpMcpServerHost, IHttpServerReadySignal
 ├── Agents/
 │   ├── Prompts/       # Agent prompt classes (C#) and IPromptFactory
-│   └── Definitions/   # AgentRoster configuration
-└── Storage/           # SQLite state store
+│   ├── Definitions/   # AgentRoster configuration
+│   └── ClaudeCodeSpawner.cs
+└── Storage/           # IStateStore, SqliteStateStore, ApmasDbContext
 ```
 
 ## License

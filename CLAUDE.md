@@ -33,9 +33,14 @@ dotnet watch --project src/Apmas.Server
 |---------|----------------|
 | `SupervisorService` | Background service that monitors heartbeats, detects timeouts, manages agent lifecycle |
 | `AgentStateManager` | Single source of truth for project and agent state |
-| `MessageBus` | Inter-agent communication with guaranteed delivery |
-| `AgentSpawner` | Launches Claude Code agents via CLI |
+| `MessageBus` | Inter-agent messaging with guaranteed persistence and real-time subscriptions |
+| `ClaudeCodeSpawner` | Spawns Claude Code agents via CLI and manages process lifecycle |
+| `HeartbeatMonitor` | Tracks agent liveliness; detects unhealthy agents based on heartbeat timeout |
+| `TimeoutHandler` | Implements progressive retry strategy on agent timeout |
 | `ContextCheckpointService` | Saves/restores agent progress for context limit recovery |
+| `DependencyResolver` | Analyzes agent dependency graph and validates configuration |
+| `TaskDecomposerService` | Decomposes work items into subtasks based on context limits |
+| `NotificationService` | Sends escalation notifications (Console, Email, or Slack) |
 
 ### MCP Tools (in `Mcp/Tools/`)
 
@@ -50,6 +55,22 @@ Agents use these tools to communicate with the orchestrator:
 | `apmas_send_message` | Send message to another agent |
 | `apmas_request_help` | Request human or agent assistance |
 | `apmas_complete` | Signal task completion |
+
+### MCP Resources (in `Mcp/Resources/`)
+
+| Resource URI | Purpose |
+|--------------|---------|
+| `apmas://project/state` | Current project state as JSON |
+| `apmas://messages/{agentRole}` | Messages addressed to/from an agent |
+| `apmas://checkpoints/{agentRole}` | Checkpoint history for an agent |
+
+### Transport
+
+APMAS uses HTTP/SSE for agent communication:
+- Server binds to `localhost:5050` (configurable via `HttpTransport` options)
+- Agents connect via MCP HTTP transport with Server-Sent Events
+- SSE keep-alive comments sent every 30 seconds
+- Graceful shutdown: close stdin, wait timeout (5s default), force kill if needed
 
 ### Agent Lifecycle States
 
@@ -73,18 +94,20 @@ Pending → Queued → Spawning → Running → Completed
 
 ```
 src/Apmas.Server/
-├── Configuration/     # ApmasOptions, TimeoutPolicies
+├── Configuration/     # ApmasOptions, TimeoutOptions, HttpTransportOptions, etc.
 ├── Core/
-│   ├── Services/      # SupervisorService, AgentStateManager, MessageBus, AgentSpawner
+│   ├── Services/      # SupervisorService, AgentStateManager, MessageBus, HeartbeatMonitor, etc.
 │   ├── Models/        # ProjectState, AgentState, AgentMessage, Checkpoint, WorkItem
 │   └── Enums/         # AgentStatus, MessageType, ProjectPhase
 ├── Mcp/
 │   ├── Tools/         # MCP tool handlers
-│   └── Resources/     # MCP resource handlers
+│   ├── Resources/     # MCP resource handlers
+│   └── Http/          # HttpMcpServerHost, IHttpServerReadySignal
 ├── Agents/
 │   ├── Prompts/       # Agent prompt classes (C#) and IPromptFactory
-│   └── Definitions/   # AgentRoster configuration
-└── Storage/           # IStateStore implementations (SQLite, File)
+│   ├── Definitions/   # AgentRoster configuration
+│   └── ClaudeCodeSpawner.cs
+└── Storage/           # IStateStore, SqliteStateStore, ApmasDbContext
 ```
 
 ### Runtime Data (`.apmas/` in target project)
