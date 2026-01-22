@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace Apmas.Server.Mcp.Http;
 
@@ -66,6 +67,10 @@ public class HttpMcpServerHost : BackgroundService
         try
         {
             var builder = WebApplication.CreateSlimBuilder();
+
+            // Use Serilog for logging instead of default console logger
+            builder.Logging.ClearProviders();
+            builder.Host.UseSerilog(Log.Logger, dispose: false);
 
             // Configure Kestrel with request size limits (Issue #2)
             builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>

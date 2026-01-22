@@ -7,6 +7,7 @@ using Apmas.Server.Agents.Prompts;
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Models;
 using Apmas.Server.Core.Services;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,19 +24,106 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
     private readonly IPromptFactory _promptFactory;
     private readonly IAgentStateManager _stateManager;
     private readonly ConcurrentDictionary<string, ManagedProcess> _processes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly CancellationTokenRegistration _shutdownRegistration;
 
     public ClaudeCodeSpawner(
         ILogger<ClaudeCodeSpawner> logger,
         IOptions<ApmasOptions> apmasOptions,
         IOptions<SpawnerOptions> spawnerOptions,
         IPromptFactory promptFactory,
-        IAgentStateManager stateManager)
+        IAgentStateManager stateManager,
+        IHostApplicationLifetime applicationLifetime)
     {
         _logger = logger;
         _apmasOptions = apmasOptions.Value;
         _spawnerOptions = spawnerOptions.Value;
         _promptFactory = promptFactory;
         _stateManager = stateManager;
+
+        // Register for graceful shutdown
+        _shutdownRegistration = applicationLifetime.ApplicationStopping.Register(OnApplicationStopping);
+    }
+
+    private void OnApplicationStopping()
+    {
+        _logger.LogInformation("Application stopping - initiating graceful shutdown of {Count} agent processes", _processes.Count);
+        ShutdownAllAgentsAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Gracefully shuts down all running agent processes.
+    /// </summary>
+    public async Task ShutdownAllAgentsAsync()
+    {
+        if (_processes.IsEmpty)
+        {
+            return;
+        }
+
+        var shutdownTasks = new List<Task>();
+        var timeout = TimeSpan.FromMilliseconds(_spawnerOptions.GracefulShutdownTimeoutMs);
+
+        foreach (var kvp in _processes.ToArray())
+        {
+            shutdownTasks.Add(ShutdownAgentAsync(kvp.Key, kvp.Value, timeout));
+        }
+
+        await Task.WhenAll(shutdownTasks);
+        _processes.Clear();
+    }
+
+    private async Task ShutdownAgentAsync(string agentRole, ManagedProcess managedProcess, TimeSpan timeout)
+    {
+        try
+        {
+            if (managedProcess.Process.HasExited)
+            {
+                _logger.LogDebug("Agent {AgentRole} already exited", agentRole);
+                CleanupManagedProcess(managedProcess);
+                return;
+            }
+
+            _logger.LogInformation("Gracefully shutting down agent {AgentRole} (PID {Pid})", agentRole, managedProcess.Process.Id);
+
+            // Try graceful shutdown first by closing stdin (signals EOF to the process)
+            try
+            {
+                managedProcess.Process.StandardInput?.Close();
+            }
+            catch
+            {
+                // Stdin may not be available
+            }
+
+            // Wait for graceful exit
+            using var cts = new CancellationTokenSource(timeout);
+            try
+            {
+                await managedProcess.Process.WaitForExitAsync(cts.Token);
+                _logger.LogInformation("Agent {AgentRole} exited gracefully", agentRole);
+            }
+            catch (OperationCanceledException)
+            {
+                // Graceful shutdown timed out, force kill
+                _logger.LogWarning("Agent {AgentRole} did not exit gracefully within {Timeout}ms, forcing termination",
+                    agentRole, timeout.TotalMilliseconds);
+
+                try
+                {
+                    managedProcess.Process.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error killing agent {AgentRole}", agentRole);
+                }
+            }
+
+            CleanupManagedProcess(managedProcess);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during shutdown of agent {AgentRole}", agentRole);
+        }
     }
 
     public async Task<SpawnResult> SpawnAgentAsync(
@@ -132,22 +220,25 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
 
             process = new Process { StartInfo = processStartInfo };
 
-            // Set up async output/error handling
-            process.OutputDataReceived += (sender, e) =>
+            // Set up async output/error handling (configurable)
+            if (_spawnerOptions.LogAgentOutput)
             {
-                if (!string.IsNullOrEmpty(e.Data))
+                process.OutputDataReceived += (sender, e) =>
                 {
-                    _logger.LogDebug("[{AgentRole}] stdout: {Output}", agentRole, e.Data);
-                }
-            };
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        LogAgentOutput(agentRole, e.Data, isError: false);
+                    }
+                };
 
-            process.ErrorDataReceived += (sender, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
+                process.ErrorDataReceived += (sender, e) =>
                 {
-                    _logger.LogWarning("[{AgentRole}] stderr: {Error}", agentRole, e.Data);
-                }
-            };
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        LogAgentOutput(agentRole, e.Data, isError: true);
+                    }
+                };
+            }
 
             // Start the process
             if (!process.Start())
@@ -594,8 +685,38 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         }
     }
 
+    private void LogAgentOutput(string agentRole, string output, bool isError)
+    {
+        if (isError)
+        {
+            // Stderr is always logged as warning
+            _logger.LogWarning("[{AgentRole}] stderr: {Output}", agentRole, output);
+        }
+        else
+        {
+            // Stdout uses configurable log level
+            switch (_spawnerOptions.AgentOutputLogLevel.ToLowerInvariant())
+            {
+                case "information":
+                case "info":
+                    _logger.LogInformation("[{AgentRole}] stdout: {Output}", agentRole, output);
+                    break;
+                case "warning":
+                case "warn":
+                    _logger.LogWarning("[{AgentRole}] stdout: {Output}", agentRole, output);
+                    break;
+                case "debug":
+                default:
+                    _logger.LogDebug("[{AgentRole}] stdout: {Output}", agentRole, output);
+                    break;
+            }
+        }
+    }
+
     public void Dispose()
     {
+        _shutdownRegistration.Dispose();
+
         foreach (var kvp in _processes)
         {
             try

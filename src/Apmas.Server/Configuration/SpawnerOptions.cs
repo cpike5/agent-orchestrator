@@ -47,4 +47,16 @@ public class SpawnerOptions
     /// When true, spawned agents will connect to the HTTP endpoint instead of spawning their own server.
     /// </summary>
     public bool UseHttpTransport { get; set; } = true;
+
+    /// <summary>
+    /// Whether to log agent stdout/stderr output.
+    /// Set to false to reduce log noise from agent processes.
+    /// </summary>
+    public bool LogAgentOutput { get; set; } = true;
+
+    /// <summary>
+    /// Log level for agent stdout output. Options: "Debug", "Information", "Warning".
+    /// Only applies when LogAgentOutput is true.
+    /// </summary>
+    public string AgentOutputLogLevel { get; set; } = "Debug";
 }
