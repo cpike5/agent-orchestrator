@@ -1,6 +1,6 @@
 # APMAS: Autonomous Project Management Agent System
 
-## .NET MCP Server Specification
+## .NET 8 MCP Server Specification
 
 A comprehensive specification for a multi-agent coordination system using a .NET MCP (Model Context Protocol) server as the central orchestration layer.
 
@@ -10,28 +10,39 @@ A comprehensive specification for a multi-agent coordination system using a .NET
 
 1. [Executive Summary](#executive-summary)
 2. [Architecture Overview](#architecture-overview)
-3. [Core Components](#core-components)
+3. [Core Services](#core-services)
 4. [MCP Server Design](#mcp-server-design)
-5. [Agent Lifecycle Management](#agent-lifecycle-management)
-6. [Timeout Handling](#timeout-handling)
-7. [Context Limit Management](#context-limit-management)
-8. [Monitoring & Observability](#monitoring--observability)
-9. [Data Models](#data-models)
-10. [MCP Tools Specification](#mcp-tools-specification)
-11. [Agent Prompts](#agent-prompts)
-12. [Implementation Plan](#implementation-plan)
+5. [MCP Tools Specification](#mcp-tools-specification)
+6. [MCP Resources](#mcp-resources)
+7. [Agent Lifecycle Management](#agent-lifecycle-management)
+8. [Timeout Handling](#timeout-handling)
+9. [Context Limit Management](#context-limit-management)
+10. [Data Models](#data-models)
+11. [Configuration Reference](#configuration-reference)
+12. [Transport Mechanisms](#transport-mechanisms)
+13. [Storage Layer](#storage-layer)
+14. [Monitoring & Observability](#monitoring--observability)
+15. [Agent Prompts](#agent-prompts)
 
 ---
 
 ## Executive Summary
 
-APMAS is a multi-agent coordination system that enables autonomous AI agents to collaborate on software projects. Based on lessons learned from the blog-prototype POC, this system addresses three critical challenges:
+APMAS is a multi-agent coordination system that enables autonomous AI agents to collaborate on software projects. The system addresses three critical challenges:
 
 1. **Agent Timeouts**: Agents that hang or take too long
 2. **Context Limits**: Agents exhausting their context window
 3. **Monitoring & Restart**: Detecting failures and recovering gracefully
 
 The key architectural insight: **Agents cannot self-coordinate reliably**. An external orchestrator (the MCP server) must manage agent lifecycle, dependencies, and communication.
+
+### Key Features
+
+- **HTTP/SSE Transport**: Spawned agents connect back via HTTP with Server-Sent Events
+- **SQLite Persistence**: All state stored in a local SQLite database
+- **Background Supervisor**: Continuous monitoring and lifecycle management
+- **Progressive Retry**: Checkpoint recovery, scope reduction, then human escalation
+- **Inter-Agent Messaging**: Guaranteed delivery message bus
 
 ---
 
@@ -45,17 +56,26 @@ The key architectural insight: **Agents cannot self-coordinate reliably**. An ex
 │  │  Service    │  │  Manager    │  │   Bus       │  │  Spawner    │        │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │         │                │                │                │                │
-│         └────────────────┴────────────────┴────────────────┘                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  Heartbeat  │  │  Timeout    │  │ Checkpoint  │  │ Dependency  │        │
+│  │  Monitor    │  │  Handler    │  │  Service    │  │  Resolver   │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                    │                                        │
 │  ┌─────────────────────────────────┴─────────────────────────────────┐     │
 │  │                    MCP Tool Handlers                               │     │
 │  │  • apmas_heartbeat    • apmas_report_status   • apmas_get_context │     │
 │  │  • apmas_checkpoint   • apmas_request_help    • apmas_complete    │     │
+│  │  • apmas_send_message                                              │     │
+│  └───────────────────────────────────────────────────────────────────┘     │
+│                                    │                                        │
+│  ┌─────────────────────────────────┴─────────────────────────────────┐     │
+│  │              HTTP/SSE MCP Transport (HttpMcpServerHost)            │     │
+│  │                    localhost:5050 (configurable)                   │     │
 │  └───────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
               ┌─────────────────────┼─────────────────────┐
-              │ MCP Protocol        │ MCP Protocol        │ MCP Protocol
+              │ HTTP/SSE            │ HTTP/SSE            │ HTTP/SSE
               ▼                     ▼                     ▼
     ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
     │  Claude Agent   │   │  Claude Agent   │   │  Claude Agent   │
@@ -68,69 +88,55 @@ The key architectural insight: **Agents cannot self-coordinate reliably**. An ex
               ▼                     ▼                     ▼
     ┌─────────────────────────────────────────────────────────────┐
     │                    Project Directory                         │
-    │  ├── .apmas/           (state, logs, checkpoints)           │
+    │  ├── .apmas/           (state.db, logs/, checkpoints/)      │
     │  ├── docs/             (documentation artifacts)            │
     │  ├── src/              (source code artifacts)              │
     │  └── tests/            (test artifacts)                     │
     └─────────────────────────────────────────────────────────────┘
 ```
 
----
+### Runtime Data Structure
 
-## Core Components
-
-### 1. Supervisor Service
-
-The brain of APMAS. Runs as a background service that:
-
-- Monitors agent heartbeats
-- Detects timeouts and failures
-- Manages agent lifecycle (spawn, restart, terminate)
-- Enforces dependency ordering
-- Escalates to humans when needed
-
-```csharp
-public class SupervisorService : BackgroundService
-{
-    private readonly IAgentStateManager _stateManager;
-    private readonly IAgentSpawner _spawner;
-    private readonly IMessageBus _messageBus;
-    private readonly SupervisorOptions _options;
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await CheckAgentHealthAsync();
-            await ProcessPendingAgentsAsync();
-            await CheckDependenciesAsync();
-
-            await Task.Delay(_options.PollingInterval, stoppingToken);
-        }
-    }
-}
+```
+.apmas/                    # Data directory (configurable)
+├── state.db               # SQLite database with all state
+├── logs/                  # Serilog rolling daily logs
+│   ├── apmas-20260122.log
+│   └── apmas-20260121.log
+└── checkpoints/           # Agent progress checkpoints (future)
 ```
 
-### 2. State Manager
+---
 
-Maintains the single source of truth for project and agent state:
+## Core Services
+
+| Service | Interface | Responsibility |
+|---------|-----------|----------------|
+| **SupervisorService** | BackgroundService | Polls periodically to monitor agent health, check dependencies, and spawn ready agents |
+| **AgentStateManager** | IAgentStateManager | Single source of truth for project and agent state; manages state caching and transitions |
+| **MessageBus** | IMessageBus | Inter-agent messaging with guaranteed persistence and real-time subscription support |
+| **ClaudeCodeSpawner** | IAgentSpawner | Spawns Claude Code agents via CLI and manages their process lifecycle |
+| **HeartbeatMonitor** | IHeartbeatMonitor | Tracks agent liveliness; detects unhealthy agents based on heartbeat timeout |
+| **TimeoutHandler** | ITimeoutHandler | Implements progressive retry strategy on agent timeout |
+| **ContextCheckpointService** | IContextCheckpointService | Manages agent checkpoints and generates resumption context |
+| **DependencyResolver** | IDependencyResolver | Analyzes agent dependency graph and validates configuration at startup |
+| **TaskDecomposerService** | ITaskDecomposerService | Decomposes work items into subtasks based on context size limits |
+| **NotificationService** | INotificationService | Sends escalation notifications (Console, Email, or Slack) |
+| **ApmasMetrics** | IApmasMetrics | Collects observability metrics (agent counts, task durations, timeouts) |
+| **ApmasHealthCheck** | IHealthCheck | Reports system health status |
+
+### Service Interfaces
 
 ```csharp
 public interface IAgentStateManager
 {
-    Task<ProjectState> GetProjectStateAsync();
-    Task<AgentState> GetAgentStateAsync(string agentRole);
-    Task UpdateAgentStateAsync(string agentRole, AgentState state);
-    Task<IReadOnlyList<AgentState>> GetActiveAgentsAsync();
-    Task<IReadOnlyList<string>> GetReadyAgentsAsync();
+    Task<ProjectState?> GetProjectStateAsync();
+    Task<AgentState?> GetAgentStateAsync(string role);
+    Task<IReadOnlyList<AgentState>> GetAllAgentStatesAsync();
+    Task SaveProjectStateAsync(ProjectState state);
+    Task SaveAgentStateAsync(AgentState state);
 }
-```
 
-### 3. Message Bus
-
-Handles inter-agent communication with guaranteed delivery:
-
-```csharp
 public interface IMessageBus
 {
     Task PublishAsync(AgentMessage message);
@@ -138,18 +144,43 @@ public interface IMessageBus
     Task<IReadOnlyList<AgentMessage>> GetAllMessagesAsync(int? limit = null);
     IAsyncEnumerable<AgentMessage> SubscribeAsync(string? agentRole = null, CancellationToken ct = default);
 }
-```
 
-### 4. Agent Spawner
-
-Launches Claude Code agents with proper configuration:
-
-```csharp
 public interface IAgentSpawner
 {
-    Task<SpawnResult> SpawnAgentAsync(AgentConfig config, string? additionalContext = null);
-    Task<bool> TerminateAgentAsync(string agentRole);
+    Task<SpawnResult> SpawnAgentAsync(string role, string subagentType, string? checkpointContext = null);
+    Task TerminateAgentAsync(string agentRole);
     Task<AgentProcessInfo?> GetAgentProcessAsync(string agentRole);
+    Task ShutdownAllAgentsAsync();
+}
+
+public interface IHeartbeatMonitor
+{
+    void RecordHeartbeat(string agentRole);
+    bool IsAgentHealthy(string agentRole);
+    Task<IReadOnlyList<string>> GetUnhealthyAgentsAsync();
+}
+
+public interface ITimeoutHandler
+{
+    Task HandleTimeoutAsync(string agentRole);
+}
+
+public interface IContextCheckpointService
+{
+    Task SaveCheckpointAsync(Checkpoint checkpoint);
+    Task<Checkpoint?> GetLatestCheckpointAsync(string agentRole);
+    Task<string> GenerateResumptionContextAsync(string agentRole);
+}
+
+public interface IDependencyResolver
+{
+    Task<IReadOnlyList<string>> GetReadyAgentsAsync();
+    (bool IsValid, IReadOnlyList<string> Errors) ValidateDependencyGraph();
+}
+
+public interface INotificationService
+{
+    Task SendEscalationAsync(EscalationNotification notification);
 }
 ```
 
@@ -160,30 +191,42 @@ public interface IAgentSpawner
 ### Project Structure
 
 ```
-Apmas.Server/
-├── Apmas.Server.csproj
-├── Program.cs
-├── appsettings.json
-│
-├── Configuration/
+src/Apmas.Server/
+├── Configuration/              # Options pattern configuration classes
 │   ├── ApmasOptions.cs
-│   ├── AgentDefinitions.cs
-│   └── TimeoutPolicies.cs
+│   ├── AgentOptions.cs
+│   ├── TimeoutOptions.cs
+│   ├── SpawnerOptions.cs
+│   ├── HttpTransportOptions.cs
+│   ├── DecompositionOptions.cs
+│   ├── NotificationOptions.cs
+│   └── MetricsOptions.cs
 │
 ├── Core/
-│   ├── Services/
+│   ├── Services/               # Core business logic
 │   │   ├── SupervisorService.cs
 │   │   ├── AgentStateManager.cs
 │   │   ├── MessageBus.cs
-│   │   ├── AgentSpawner.cs
-│   │   └── ContextCheckpointService.cs
+│   │   ├── HeartbeatMonitor.cs
+│   │   ├── TimeoutHandler.cs
+│   │   ├── ContextCheckpointService.cs
+│   │   ├── DependencyResolver.cs
+│   │   ├── TaskDecomposerService.cs
+│   │   ├── ConsoleNotificationService.cs
+│   │   ├── EmailNotificationService.cs
+│   │   ├── SlackNotificationService.cs
+│   │   ├── ApmasMetrics.cs
+│   │   └── ApmasHealthCheck.cs
 │   │
-│   ├── Models/
+│   ├── Models/                 # Data models (EF Core entities)
 │   │   ├── ProjectState.cs
 │   │   ├── AgentState.cs
 │   │   ├── AgentMessage.cs
 │   │   ├── Checkpoint.cs
-│   │   └── WorkItem.cs
+│   │   ├── WorkItem.cs
+│   │   ├── EscalationNotification.cs
+│   │   ├── AgentProcessInfo.cs
+│   │   └── SpawnResult.cs
 │   │
 │   └── Enums/
 │       ├── AgentStatus.cs
@@ -191,37 +234,57 @@ Apmas.Server/
 │       └── ProjectPhase.cs
 │
 ├── Mcp/
-│   ├── ApmasMcpServer.cs
+│   ├── IMcpTool.cs
+│   ├── ToolResult.cs
+│   ├── IMcpResource.cs
+│   ├── ResourceResult.cs
+│   ├── McpToolRegistry.cs
+│   ├── McpResourceRegistry.cs
+│   ├── McpServerHost.cs
+│   │
 │   ├── Tools/
 │   │   ├── HeartbeatTool.cs
-│   │   ├── ReportStatusTool.cs
-│   │   ├── GetContextTool.cs
 │   │   ├── CheckpointTool.cs
-│   │   ├── RequestHelpTool.cs
+│   │   ├── GetContextTool.cs
+│   │   ├── ReportStatusTool.cs
+│   │   ├── SendMessageTool.cs
 │   │   ├── CompleteTool.cs
-│   │   └── SendMessageTool.cs
+│   │   └── RequestHelpTool.cs
 │   │
-│   └── Resources/
-│       ├── ProjectStateResource.cs
-│       ├── AgentMessagesResource.cs
-│       └── CheckpointResource.cs
+│   ├── Resources/
+│   │   ├── ProjectStateResource.cs
+│   │   ├── AgentMessagesResource.cs
+│   │   └── CheckpointResource.cs
+│   │
+│   └── Http/                   # HTTP/SSE transport
+│       ├── HttpMcpServerHost.cs
+│       └── IHttpServerReadySignal.cs
 │
 ├── Agents/
 │   ├── Prompts/
+│   │   ├── IPromptFactory.cs
+│   │   ├── PromptFactory.cs
 │   │   ├── BaseAgentPrompt.cs
-│   │   ├── ProjectManagerPrompt.cs
 │   │   ├── ArchitectPrompt.cs
+│   │   ├── DesignerPrompt.cs
 │   │   ├── DeveloperPrompt.cs
 │   │   ├── ReviewerPrompt.cs
 │   │   └── TesterPrompt.cs
 │   │
-│   └── Definitions/
-│       └── AgentRoster.cs
+│   ├── Definitions/
+│   │   └── AgentRoster.cs
+│   │
+│   ├── ClaudeCodeSpawner.cs
+│   └── NativeMethods.cs
 │
-└── Storage/
-    ├── IStateStore.cs
-    ├── FileStateStore.cs
-    └── SqliteStateStore.cs
+├── Storage/
+│   ├── IStateStore.cs
+│   ├── SqliteStateStore.cs
+│   ├── ApmasDbContext.cs
+│   └── Migrations/
+│
+├── Program.cs
+└── appsettings.json
 ```
 
 ### Dependency Injection Setup
@@ -230,30 +293,432 @@ Apmas.Server/
 // Program.cs
 var builder = Host.CreateApplicationBuilder(args);
 
+// Bootstrap logger (console + Seq only)
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.Seq("http://localhost:5341")
+    .CreateBootstrapLogger();
+
+builder.Services.AddSerilog((services, config) => config
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.WithProperty("Application", "APMAS"));
+
 // Configuration
 builder.Services.Configure<ApmasOptions>(
     builder.Configuration.GetSection("Apmas"));
 
-// Core Services
-builder.Services.AddSingleton<IAgentStateManager, AgentStateManager>();
-builder.Services.AddSingleton<IMessageBus, MessageBus>();
-builder.Services.AddSingleton<IAgentSpawner, ClaudeCodeSpawner>();
-builder.Services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
-builder.Services.AddSingleton<IStateStore, SqliteStateStore>();
+// Storage layer
+builder.Services.AddStorageServices();
 
-// Background Services
+// Core services
+builder.Services.AddCoreServices();
+
+// Agent roster and spawner
+builder.Services.AddAgentRoster();
+builder.Services.AddAgentSpawner();
+
+// MCP server and tools
+builder.Services.AddMcpServer();
+builder.Services.AddMcpTools();
+builder.Services.AddMcpResources();
+
+// Background services
+builder.Services.AddHostedService<HttpMcpServerHost>();
 builder.Services.AddHostedService<SupervisorService>();
-builder.Services.AddHostedService<McpServerHost>();
-
-// Logging
-builder.Services.AddSerilog(config => config
-    .WriteTo.Console()
-    .WriteTo.Seq("http://localhost:5341")
-    .Enrich.WithProperty("Application", "APMAS"));
 
 var host = builder.Build();
+
+// Initialize database
+await host.Services.GetRequiredService<IStateStore>().EnsureStorageCreatedAsync();
+
+// Initialize project state from configuration
+await InitializeFromConfigAsync(host.Services);
+
+// Validate dependency graph
+var resolver = host.Services.GetRequiredService<IDependencyResolver>();
+var (isValid, errors) = resolver.ValidateDependencyGraph();
+if (!isValid)
+{
+    Log.Fatal("Invalid dependency graph: {Errors}", errors);
+    return 1;
+}
+
 await host.RunAsync();
 ```
+
+---
+
+## MCP Tools Specification
+
+All tools require an `agentRole` parameter to identify the calling agent.
+
+### apmas_heartbeat
+
+Signal alive status and extend timeout window.
+
+**When to call**: Every 5 minutes while working.
+
+```json
+{
+  "name": "apmas_heartbeat",
+  "description": "Signal that you are still working. Call every 5 minutes.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["working", "thinking", "writing"],
+        "description": "Current activity status"
+      },
+      "progress": {
+        "type": "string",
+        "description": "Brief description of current work"
+      },
+      "estimatedContextUsage": {
+        "type": "integer",
+        "description": "Estimated tokens used (if known)"
+      }
+    },
+    "required": ["agentRole", "status"]
+  }
+}
+```
+
+**Returns**: Success message with new timeout timestamp.
+
+**Implementation**: Updates agent's `LastHeartbeat` and `TimeoutAt`, records heartbeat in monitor.
+
+---
+
+### apmas_checkpoint
+
+Save progress checkpoint for recovery after timeout.
+
+**When to call**: After completing major subtasks.
+
+```json
+{
+  "name": "apmas_checkpoint",
+  "description": "Save a checkpoint of your progress for recovery.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Brief summary of current state"
+      },
+      "completedItems": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of completed work items"
+      },
+      "pendingItems": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of remaining work items"
+      },
+      "activeFiles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Files currently being worked on"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Notes for continuation"
+      }
+    },
+    "required": ["agentRole", "summary", "completedItems", "pendingItems"]
+  }
+}
+```
+
+**Returns**: Success message with completion percentage.
+
+---
+
+### apmas_get_context
+
+Retrieve project state, agent outputs, and messages for coordination.
+
+**When to call**: Before making decisions; to understand other agents' work; when blocked.
+
+```json
+{
+  "name": "apmas_get_context",
+  "description": "Get current project context, other agents' outputs, and messages.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "include": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "What to include: 'project', 'agents', 'messages', 'artifacts'"
+      },
+      "agentRoles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Specific agent roles to get info about"
+      },
+      "messageLimit": {
+        "type": "integer",
+        "description": "Max messages to return (default: 50)"
+      }
+    }
+  }
+}
+```
+
+**Returns**: JSON object with requested sections:
+
+```json
+{
+  "project": {
+    "name": "my-project",
+    "workingDirectory": "/path/to/project",
+    "phase": "Building",
+    "startedAt": "2026-01-22T10:00:00Z"
+  },
+  "agents": [
+    {
+      "role": "architect",
+      "status": "Completed",
+      "lastMessage": "Architecture complete",
+      "spawnedAt": "2026-01-22T10:05:00Z"
+    }
+  ],
+  "messages": [...],
+  "artifacts": ["docs/architecture.md", "src/index.html"]
+}
+```
+
+---
+
+### apmas_report_status
+
+Report current status, progress, and artifacts.
+
+**When to call**: Regularly during work; when status changes.
+
+```json
+{
+  "name": "apmas_report_status",
+  "description": "Report your current status and any artifacts created.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["working", "done", "blocked", "needs_review", "context_limit"],
+        "description": "Current status"
+      },
+      "message": {
+        "type": "string",
+        "description": "Status message"
+      },
+      "artifacts": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of files created or modified"
+      },
+      "blockedReason": {
+        "type": "string",
+        "description": "If blocked, explain why"
+      }
+    },
+    "required": ["agentRole", "status", "message"]
+  }
+}
+```
+
+**Returns**: Confirmation message.
+
+**Special handling**:
+- `blocked`: Requires `blockedReason`
+- `context_limit`: Sets agent to Paused status for resumption
+
+---
+
+### apmas_send_message
+
+Send a message to another agent or broadcast.
+
+**When to call**: To ask questions, request help, or share information.
+
+```json
+{
+  "name": "apmas_send_message",
+  "description": "Send a message to another agent or broadcast to all.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier (sender)"
+      },
+      "to": {
+        "type": "string",
+        "description": "Target agent role or 'all' for broadcast"
+      },
+      "type": {
+        "type": "string",
+        "enum": ["question", "answer", "info", "request"],
+        "description": "Message type"
+      },
+      "content": {
+        "type": "string",
+        "description": "Message content"
+      }
+    },
+    "required": ["agentRole", "to", "type", "content"]
+  }
+}
+```
+
+**Returns**: Confirmation with message ID.
+
+---
+
+### apmas_request_help
+
+Request human intervention or another agent's assistance.
+
+**When to call**: When stuck, encountering unknown issues, or needing decisions.
+
+```json
+{
+  "name": "apmas_request_help",
+  "description": "Request help when blocked.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier"
+      },
+      "helpType": {
+        "type": "string",
+        "enum": ["human", "agent", "clarification"],
+        "description": "Type of help needed"
+      },
+      "targetAgent": {
+        "type": "string",
+        "description": "If requesting agent help, which agent"
+      },
+      "issue": {
+        "type": "string",
+        "description": "What you need help with"
+      },
+      "context": {
+        "type": "string",
+        "description": "Relevant context"
+      }
+    },
+    "required": ["agentRole", "helpType", "issue"]
+  }
+}
+```
+
+**Behavior**:
+- `human`: Sets status to Escalated; sends notification via configured provider
+- `agent`: Sends Question message to target agent
+- `clarification`: Sends Question message to supervisor
+
+---
+
+### apmas_complete
+
+Signal task completion.
+
+**When to call**: When all assigned work is finished.
+
+```json
+{
+  "name": "apmas_complete",
+  "description": "Signal that your task is complete.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agentRole": {
+        "type": "string",
+        "description": "Your agent role identifier"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Summary of what was accomplished"
+      },
+      "artifacts": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of all files created or modified"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Notes for downstream agents"
+      }
+    },
+    "required": ["agentRole", "summary", "artifacts"]
+  }
+}
+```
+
+**Returns**: Success message with execution duration.
+
+---
+
+## MCP Resources
+
+Resources provide read-only access to data via URI patterns.
+
+### apmas://project/state
+
+Current project state as JSON.
+
+**URI**: `apmas://project/state`
+
+**Returns**:
+```json
+{
+  "name": "my-project",
+  "workingDirectory": "/path/to/project",
+  "phase": "Building",
+  "startedAt": "2026-01-22T10:00:00Z",
+  "completedAt": null
+}
+```
+
+**Caching**: 5 seconds to avoid database thrashing.
+
+---
+
+### apmas://messages/{agentRole}
+
+Messages addressed to or from a specific agent.
+
+**URI**: `apmas://messages/{agentRole}`
+
+**Returns**: Filtered message list including broadcasts (To="all").
+
+---
+
+### apmas://checkpoints/{agentRole}
+
+Checkpoint history for an agent.
+
+**URI**: `apmas://checkpoints/{agentRole}`
+
+**Returns**: Array of checkpoints ordered by creation time (newest first).
 
 ---
 
@@ -279,73 +744,94 @@ public enum AgentStatus
 ### State Transitions
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │                                     │
-                    ▼                                     │
-┌─────────┐    ┌─────────┐    ┌─────────┐    ┌──────────┐│
-│ Pending │───▶│ Queued  │───▶│Spawning │───▶│ Running  ││
-└─────────┘    └─────────┘    └─────────┘    └──────────┘│
-     ▲              │              │              │       │
-     │              │              │              │       │
-     │              ▼              ▼              ▼       │
-     │         ┌─────────┐   ┌─────────┐    ┌─────────┐  │
-     │         │ Failed  │   │ Failed  │    │ Paused  │──┘
-     │         └─────────┘   └─────────┘    └─────────┘
-     │              │              │              │
-     │              └──────┬───────┘              │
-     │                     ▼                      │
-     │              ┌───────────┐                 │
-     │              │ Escalated │                 │
-     │              └───────────┘                 │
-     │                                            │
-     │    ┌───────────┐                          │
-     └────│ Completed │◀─────────────────────────┘
-          └───────────┘
-                ▲
-                │
-          ┌───────────┐
-          │ TimedOut  │ (retry → Queued, or escalate)
-          └───────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Agent Lifecycle                         │
+└─────────────────────────────────────────────────────────────┘
+
+    ┌────────────┐
+    │  Pending   │ (waiting for dependencies)
+    └─────┬──────┘
+          │ (dependencies met)
+    ┌─────▼──────┐
+    │  Queued    │ (ready to spawn)
+    └─────┬──────┘
+          │ (spawned)
+    ┌─────▼─────────┐
+    │  Spawning     │ (launching process)
+    └─────┬─────────┘
+          │
+    ┌─────▼────────┐
+    │  Running     │ (actively working)
+    └─┬──────────┬─┘
+      │          │
+(checkpoint) (timeout)
+      │          │
+    ┌─▼────┐   ┌─▼────────────┐
+    │Paused│   │  TimedOut    │
+    └─┬────┘   └─┬────────────┘
+      │          │ (retry strategy)
+      │        ┌─▼─┐
+      │        │ 1 │ restart with checkpoint
+      │        │ 2 │ restart with reduced scope
+      │        │ 3 │ escalate to human
+      │        └───┘
+      │          │
+      └────┬─────┘
+           │ (resume)
+      ┌────▼──────┐
+      │  Running  │
+      └─┬─────────┘
+        │
+   (completes)
+        │
+    ┌───▼──────────┐
+    │  Completed   │
+    └──────────────┘
+
+   Alternative:
+    ┌────────┐
+    │ Failed │ (internal error)
+    └────────┘
+
+    ┌──────────┐
+    │Escalated │ (human intervention needed)
+    └──────────┘
 ```
 
 ### Dependency Resolution
 
 ```csharp
-public class DependencyResolver
+public class DependencyResolver : IDependencyResolver
 {
-    private readonly IAgentStateManager _stateManager;
-    private readonly AgentRoster _roster;
-
     public async Task<IReadOnlyList<string>> GetReadyAgentsAsync()
     {
-        var projectState = await _stateManager.GetProjectStateAsync();
+        var allAgents = await _stateManager.GetAllAgentStatesAsync();
         var readyAgents = new List<string>();
 
-        foreach (var agent in _roster.Agents)
+        foreach (var agent in allAgents.Where(a => a.Status == AgentStatus.Pending))
         {
-            if (agent.Status != AgentStatus.Pending)
-                continue;
+            var dependencies = GetDependencies(agent.Role);
+            var allMet = dependencies.All(dep =>
+                allAgents.Any(a => a.Role == dep && a.Status == AgentStatus.Completed));
 
-            var dependencies = _roster.GetDependencies(agent.Role);
-            var allDependenciesMet = true;
-
-            foreach (var dep in dependencies)
-            {
-                var depState = await _stateManager.GetAgentStateAsync(dep);
-                if (depState.Status != AgentStatus.Completed)
-                {
-                    allDependenciesMet = false;
-                    break;
-                }
-            }
-
-            if (allDependenciesMet)
+            if (allMet)
             {
                 readyAgents.Add(agent.Role);
             }
         }
 
         return readyAgents;
+    }
+
+    public (bool IsValid, IReadOnlyList<string> Errors) ValidateDependencyGraph()
+    {
+        var errors = new List<string>();
+
+        // Check for undefined dependencies
+        // Check for circular dependencies
+        // Return validation result
+
+        return (errors.Count == 0, errors);
     }
 }
 ```
@@ -354,123 +840,71 @@ public class DependencyResolver
 
 ## Timeout Handling
 
-### Timeout Configuration
+### Timeout Strategy (Progressive Retry)
+
+1. **First Timeout** (RetryCount = 0):
+   - Generate resumption context from latest checkpoint
+   - Restart agent with recovery context
+   - Increment RetryCount to 1
+
+2. **Second Timeout** (RetryCount = 1):
+   - Restart with reduced scope (if supported)
+   - Increment RetryCount to 2
+
+3. **Third+ Timeout** (RetryCount >= 2):
+   - Set status to Escalated
+   - Create EscalationNotification
+   - Send to notification service
+   - Human manually intervenes
+
+### TimeoutHandler Implementation
 
 ```csharp
-public class TimeoutPolicy
+public class TimeoutHandler : ITimeoutHandler
 {
-    public TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromMinutes(30);
-    public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromMinutes(5);
-    public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromMinutes(10);
-    public int MaxRetries { get; set; } = 3;
-
-    public Dictionary<string, TimeSpan> AgentTimeouts { get; set; } = new()
-    {
-        ["architect"] = TimeSpan.FromMinutes(15),
-        ["designer"] = TimeSpan.FromMinutes(15),
-        ["developer"] = TimeSpan.FromMinutes(45),
-        ["tester"] = TimeSpan.FromMinutes(30),
-        ["reviewer"] = TimeSpan.FromMinutes(20),
-        ["docs"] = TimeSpan.FromMinutes(20)
-    };
-}
-```
-
-### Timeout Handler
-
-```csharp
-public class TimeoutHandler
-{
-    private readonly IAgentStateManager _stateManager;
-    private readonly IAgentSpawner _spawner;
-    private readonly IContextCheckpointService _checkpointService;
-    private readonly ILogger<TimeoutHandler> _logger;
-    private readonly TimeoutPolicy _policy;
-
     public async Task HandleTimeoutAsync(string agentRole)
     {
         var state = await _stateManager.GetAgentStateAsync(agentRole);
+        if (state == null) return;
+
         state.RetryCount++;
 
         _logger.LogWarning(
             "Agent {Role} timed out (attempt {Attempt}/{Max})",
-            agentRole, state.RetryCount, _policy.MaxRetries);
+            agentRole, state.RetryCount, _options.MaxRetries);
 
         if (state.RetryCount == 1)
         {
-            // First timeout: restart with checkpoint
             await RestartWithCheckpointAsync(agentRole, state);
         }
         else if (state.RetryCount == 2)
         {
-            // Second timeout: restart fresh with smaller scope
             await RestartWithReducedScopeAsync(agentRole, state);
         }
-        else if (state.RetryCount >= _policy.MaxRetries)
+        else if (state.RetryCount >= _options.MaxRetries)
         {
-            // Max retries: escalate to human
             await EscalateToHumanAsync(agentRole, state);
-        }
-        else
-        {
-            // Additional retry: restart fresh
-            await RestartFreshAsync(agentRole, state);
         }
     }
 
     private async Task RestartWithCheckpointAsync(string agentRole, AgentState state)
     {
-        var checkpoint = await _checkpointService.GetLatestCheckpointAsync(agentRole);
+        var resumptionContext = await _checkpointService.GenerateResumptionContextAsync(agentRole);
 
-        var contextInjection = $"""
-            ## CONTINUATION CONTEXT
-
-            You were previously working on this task but were interrupted.
-
-            ### Your Previous Progress:
-            {checkpoint?.Summary ?? "No checkpoint available"}
-
-            ### Files You Created:
-            {string.Join("\n", state.Artifacts.Select(a => $"- {a}"))}
-
-            ### Last Status:
-            {state.LastMessage}
-
-            **Continue from where you left off.** Do not restart from scratch.
-            """;
-
-        await _spawner.SpawnAgentAsync(
-            _roster.GetAgent(agentRole),
-            additionalContext: contextInjection);
-
-        await _stateManager.UpdateAgentStateAsync(agentRole, state with
-        {
-            Status = AgentStatus.Spawning,
-            SpawnedAt = DateTime.UtcNow,
-            TimeoutAt = DateTime.UtcNow + _policy.GetTimeoutFor(agentRole)
-        });
+        state.Status = AgentStatus.Queued;
+        state.RecoveryContext = resumptionContext;
+        await _stateManager.SaveAgentStateAsync(state);
     }
 
     private async Task EscalateToHumanAsync(string agentRole, AgentState state)
     {
-        _logger.LogError(
-            "Agent {Role} failed after {Attempts} attempts. Escalating to human.",
-            agentRole, state.RetryCount);
+        state.Status = AgentStatus.Escalated;
+        await _stateManager.SaveAgentStateAsync(state);
 
-        await _stateManager.UpdateAgentStateAsync(agentRole, state with
-        {
-            Status = AgentStatus.Escalated
-        });
+        var checkpoint = await _checkpointService.GetLatestCheckpointAsync(agentRole);
+        var notification = EscalationNotification.FromAgentState(state, checkpoint);
 
-        // Send notification (email, Slack, etc.)
-        await _notificationService.SendEscalationAsync(new EscalationNotification
-        {
-            AgentRole = agentRole,
-            FailureCount = state.RetryCount,
-            LastError = state.LastError,
-            Checkpoint = await _checkpointService.GetLatestCheckpointAsync(agentRole),
-            Artifacts = state.Artifacts
-        });
+        await _notificationService.SendEscalationAsync(notification);
     }
 }
 ```
@@ -478,10 +912,9 @@ public class TimeoutHandler
 ### Heartbeat Monitoring
 
 ```csharp
-public class HeartbeatMonitor
+public class HeartbeatMonitor : IHeartbeatMonitor
 {
     private readonly ConcurrentDictionary<string, DateTime> _lastHeartbeats = new();
-    private readonly TimeoutPolicy _policy;
 
     public void RecordHeartbeat(string agentRole)
     {
@@ -494,15 +927,17 @@ public class HeartbeatMonitor
             return false;
 
         var silentDuration = DateTime.UtcNow - lastHeartbeat;
-        return silentDuration < _policy.HeartbeatTimeout;
+        return silentDuration < _options.HeartbeatTimeout;
     }
 
-    public IReadOnlyList<string> GetUnhealthyAgents()
+    public Task<IReadOnlyList<string>> GetUnhealthyAgentsAsync()
     {
-        return _lastHeartbeats
+        var unhealthy = _lastHeartbeats
             .Where(kvp => !IsAgentHealthy(kvp.Key))
             .Select(kvp => kvp.Key)
             .ToList();
+
+        return Task.FromResult<IReadOnlyList<string>>(unhealthy);
     }
 }
 ```
@@ -511,57 +946,11 @@ public class HeartbeatMonitor
 
 ## Context Limit Management
 
-### Checkpoint Model
-
-```csharp
-public record Checkpoint
-{
-    public required string AgentRole { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public required string Summary { get; init; }
-    public required CheckpointProgress Progress { get; init; }
-    public required IReadOnlyList<string> CompletedItems { get; init; }
-    public required IReadOnlyList<string> PendingItems { get; init; }
-    public required IReadOnlyList<string> ActiveFiles { get; init; }
-    public string? Notes { get; init; }
-    public int? EstimatedContextUsage { get; init; }
-}
-
-public record CheckpointProgress
-{
-    public int CompletedTasks { get; init; }
-    public int TotalTasks { get; init; }
-    public double PercentComplete => TotalTasks > 0
-        ? (double)CompletedTasks / TotalTasks * 100
-        : 0;
-}
-```
-
 ### Checkpoint Service
 
 ```csharp
 public class ContextCheckpointService : IContextCheckpointService
 {
-    private readonly IStateStore _store;
-    private readonly ILogger<ContextCheckpointService> _logger;
-
-    public async Task SaveCheckpointAsync(string agentRole, Checkpoint checkpoint)
-    {
-        await _store.SaveCheckpointAsync(agentRole, checkpoint);
-
-        _logger.LogInformation(
-            "Checkpoint saved for {Role}: {Progress}% complete, {Completed}/{Total} tasks",
-            agentRole,
-            checkpoint.Progress.PercentComplete,
-            checkpoint.Progress.CompletedTasks,
-            checkpoint.Progress.TotalTasks);
-    }
-
-    public async Task<Checkpoint?> GetLatestCheckpointAsync(string agentRole)
-    {
-        return await _store.GetLatestCheckpointAsync(agentRole);
-    }
-
     public async Task<string> GenerateResumptionContextAsync(string agentRole)
     {
         var checkpoint = await GetLatestCheckpointAsync(agentRole);
@@ -576,16 +965,16 @@ public class ContextCheckpointService : IContextCheckpointService
             ### Summary
             {checkpoint.Summary}
 
-            ### Progress: {checkpoint.Progress.PercentComplete:F0}%
+            ### Progress: {checkpoint.PercentComplete:F0}%
 
             #### Completed:
-            {string.Join("\n", checkpoint.CompletedItems.Select(i => $"- [x] {i}"))}
+            {FormatList(checkpoint.CompletedItemsJson, "[x]")}
 
             #### Remaining:
-            {string.Join("\n", checkpoint.PendingItems.Select(i => $"- [ ] {i}"))}
+            {FormatList(checkpoint.PendingItemsJson, "[ ]")}
 
             ### Active Files
-            {string.Join("\n", checkpoint.ActiveFiles.Select(f => $"- {f}"))}
+            {FormatList(checkpoint.ActiveFilesJson)}
 
             ### Notes
             {checkpoint.Notes ?? "None"}
@@ -597,31 +986,29 @@ public class ContextCheckpointService : IContextCheckpointService
 }
 ```
 
-### Context-Aware Task Decomposition
+### Task Decomposition
 
 ```csharp
-public class TaskDecomposer
+public class TaskDecomposerService : ITaskDecomposerService
 {
-    private const int SafeContextTokens = 50_000; // Conservative estimate
-    private const int TokensPerFile = 15_000;    // Rough estimate per file
-
     public IReadOnlyList<WorkItem> DecomposeTask(WorkItem task)
     {
         var estimatedTokens = EstimateTaskTokens(task);
 
-        if (estimatedTokens <= SafeContextTokens)
+        if (estimatedTokens <= _options.SafeContextTokens)
         {
             return new[] { task };
         }
 
-        // Split into smaller work items
+        // Split into smaller work items based on file count
         var subtasks = new List<WorkItem>();
         var currentBatch = new List<string>();
         var currentEstimate = 0;
 
         foreach (var file in task.Files)
         {
-            if (currentEstimate + TokensPerFile > SafeContextTokens && currentBatch.Any())
+            if (currentEstimate + _options.TokensPerFile > _options.SafeContextTokens
+                && currentBatch.Any())
             {
                 subtasks.Add(CreateSubtask(task, currentBatch, subtasks.Count + 1));
                 currentBatch = new List<string>();
@@ -629,7 +1016,7 @@ public class TaskDecomposer
             }
 
             currentBatch.Add(file);
-            currentEstimate += TokensPerFile;
+            currentEstimate += _options.TokensPerFile;
         }
 
         if (currentBatch.Any())
@@ -639,158 +1026,6 @@ public class TaskDecomposer
 
         return subtasks;
     }
-
-    private int EstimateTaskTokens(WorkItem task)
-    {
-        return task.Files.Count * TokensPerFile;
-    }
-
-    private WorkItem CreateSubtask(WorkItem parent, List<string> files, int index)
-    {
-        return parent with
-        {
-            Id = $"{parent.Id}-{index}",
-            ParentId = parent.Id,
-            Files = files,
-            Description = $"{parent.Description} (Part {index})"
-        };
-    }
-}
-```
-
----
-
-## Monitoring & Observability
-
-### Structured Logging with Serilog
-
-```csharp
-public static class LoggingConfiguration
-{
-    public static IHostBuilder ConfigureApmasLogging(this IHostBuilder builder)
-    {
-        return builder.UseSerilog((context, config) =>
-        {
-            config
-                .MinimumLevel.Information()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .Enrich.FromLogContext()
-                .Enrich.WithProperty("Application", "APMAS")
-                .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName)
-                .WriteTo.Console(outputTemplate:
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] [{AgentRole}] {Message:lj}{NewLine}{Exception}")
-                .WriteTo.Seq("http://localhost:5341")
-                .WriteTo.File(
-                    path: ".apmas/logs/apmas-.log",
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 7);
-        });
-    }
-}
-```
-
-### Metrics Collection
-
-```csharp
-public class ApmasMetrics
-{
-    private readonly Counter<int> _agentsSpawned;
-    private readonly Counter<int> _agentsCompleted;
-    private readonly Counter<int> _agentsFailed;
-    private readonly Counter<int> _agentsTimedOut;
-    private readonly Histogram<double> _agentDuration;
-    private readonly Gauge<int> _activeAgents;
-
-    public ApmasMetrics(IMeterFactory meterFactory)
-    {
-        var meter = meterFactory.Create("Apmas");
-
-        _agentsSpawned = meter.CreateCounter<int>(
-            "apmas.agents.spawned",
-            description: "Number of agents spawned");
-
-        _agentsCompleted = meter.CreateCounter<int>(
-            "apmas.agents.completed",
-            description: "Number of agents that completed successfully");
-
-        _agentsFailed = meter.CreateCounter<int>(
-            "apmas.agents.failed",
-            description: "Number of agents that failed");
-
-        _agentsTimedOut = meter.CreateCounter<int>(
-            "apmas.agents.timedout",
-            description: "Number of agents that timed out");
-
-        _agentDuration = meter.CreateHistogram<double>(
-            "apmas.agents.duration",
-            unit: "seconds",
-            description: "Agent execution duration");
-
-        _activeAgents = meter.CreateGauge<int>(
-            "apmas.agents.active",
-            description: "Currently active agents");
-    }
-
-    public void RecordAgentSpawned(string role) =>
-        _agentsSpawned.Add(1, new KeyValuePair<string, object?>("role", role));
-
-    public void RecordAgentCompleted(string role, TimeSpan duration)
-    {
-        _agentsCompleted.Add(1, new KeyValuePair<string, object?>("role", role));
-        _agentDuration.Record(duration.TotalSeconds, new KeyValuePair<string, object?>("role", role));
-    }
-
-    public void RecordAgentFailed(string role, string reason)
-    {
-        _agentsFailed.Add(1,
-            new KeyValuePair<string, object?>("role", role),
-            new KeyValuePair<string, object?>("reason", reason));
-    }
-
-    public void RecordAgentTimedOut(string role) =>
-        _agentsTimedOut.Add(1, new KeyValuePair<string, object?>("role", role));
-
-    public void SetActiveAgents(int count) => _activeAgents.Record(count);
-}
-```
-
-### Health Check Endpoint
-
-```csharp
-public class ApmasHealthCheck : IHealthCheck
-{
-    private readonly IAgentStateManager _stateManager;
-    private readonly HeartbeatMonitor _heartbeatMonitor;
-
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        var projectState = await _stateManager.GetProjectStateAsync();
-        var unhealthyAgents = _heartbeatMonitor.GetUnhealthyAgents();
-        var activeAgents = await _stateManager.GetActiveAgentsAsync();
-
-        var data = new Dictionary<string, object>
-        {
-            ["projectPhase"] = projectState.Phase.ToString(),
-            ["activeAgents"] = activeAgents.Count,
-            ["unhealthyAgents"] = unhealthyAgents.Count
-        };
-
-        if (unhealthyAgents.Any())
-        {
-            return HealthCheckResult.Degraded(
-                $"Unhealthy agents: {string.Join(", ", unhealthyAgents)}",
-                data: data);
-        }
-
-        if (projectState.Phase == ProjectPhase.Failed)
-        {
-            return HealthCheckResult.Unhealthy("Project in failed state", data: data);
-        }
-
-        return HealthCheckResult.Healthy("APMAS is running normally", data: data);
-    }
 }
 ```
 
@@ -798,18 +1033,17 @@ public class ApmasHealthCheck : IHealthCheck
 
 ## Data Models
 
-### Project State
+### ProjectState
 
 ```csharp
-public record ProjectState
+public class ProjectState
 {
-    public required string Name { get; init; }
-    public required string WorkingDirectory { get; init; }
-    public required ProjectPhase Phase { get; init; }
-    public required DateTime StartedAt { get; init; }
-    public DateTime? CompletedAt { get; init; }
-    public IReadOnlyDictionary<string, AgentState> Agents { get; init; } =
-        new Dictionary<string, AgentState>();
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public required string WorkingDirectory { get; set; }
+    public ProjectPhase Phase { get; set; }
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
 }
 
 public enum ProjectPhase
@@ -826,40 +1060,43 @@ public enum ProjectPhase
 }
 ```
 
-### Agent State
+### AgentState
 
 ```csharp
-public record AgentState
+public class AgentState
 {
-    public required string Role { get; init; }
-    public required AgentStatus Status { get; init; }
-    public required string SubagentType { get; init; }
-    public DateTime? SpawnedAt { get; init; }
-    public DateTime? CompletedAt { get; init; }
-    public DateTime? TimeoutAt { get; init; }
-    public string? TaskId { get; init; }
-    public int RetryCount { get; init; }
-    public IReadOnlyList<string> Artifacts { get; init; } = Array.Empty<string>();
-    public IReadOnlyList<string> Dependencies { get; init; } = Array.Empty<string>();
-    public string? LastMessage { get; init; }
-    public string? LastError { get; init; }
-    public int? EstimatedContextUsage { get; init; }
+    public int Id { get; set; }
+    public required string Role { get; set; }
+    public AgentStatus Status { get; set; }
+    public required string SubagentType { get; set; }
+    public DateTime? SpawnedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public DateTime? TimeoutAt { get; set; }
+    public DateTime? LastHeartbeat { get; set; }
+    public string? TaskId { get; set; }
+    public int RetryCount { get; set; }
+    public string? ArtifactsJson { get; set; }      // JSON: ["file1.md", "file2.cs"]
+    public string? DependenciesJson { get; set; }   // JSON: ["architect", "designer"]
+    public string? LastMessage { get; set; }
+    public string? LastError { get; set; }
+    public int? EstimatedContextUsage { get; set; }
+    public string? RecoveryContext { get; set; }    // Context for timeout restart
 }
 ```
 
-### Agent Message
+### AgentMessage
 
 ```csharp
-public record AgentMessage
+public class AgentMessage
 {
-    public required string Id { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required string From { get; init; }
-    public required string To { get; init; }
-    public required MessageType Type { get; init; }
-    public required string Content { get; init; }
-    public IReadOnlyList<string>? Artifacts { get; init; }
-    public IReadOnlyDictionary<string, object>? Metadata { get; init; }
+    public required string Id { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public required string From { get; set; }
+    public required string To { get; set; }         // Role, "supervisor", or "all"
+    public MessageType Type { get; set; }
+    public required string Content { get; set; }
+    public string? ArtifactsJson { get; set; }
+    public string? MetadataJson { get; set; }
 }
 
 public enum MessageType
@@ -868,6 +1105,8 @@ public enum MessageType
     Progress,
     Question,
     Answer,
+    Info,
+    Request,
     Heartbeat,
     Checkpoint,
     Done,
@@ -880,397 +1119,431 @@ public enum MessageType
 }
 ```
 
+### Checkpoint
+
+```csharp
+public class Checkpoint
+{
+    public int Id { get; set; }
+    public required string AgentRole { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public required string Summary { get; set; }
+    public int CompletedTaskCount { get; set; }
+    public int TotalTaskCount { get; set; }
+    public double PercentComplete => TotalTaskCount > 0
+        ? (double)CompletedTaskCount / TotalTaskCount * 100
+        : 0;
+    public string? CompletedItemsJson { get; set; }
+    public string? PendingItemsJson { get; set; }
+    public string? ActiveFilesJson { get; set; }
+    public string? Notes { get; set; }
+    public int? EstimatedContextUsage { get; set; }
+}
+```
+
+### Supporting Models
+
+```csharp
+public record WorkItem
+{
+    public required string Id { get; init; }
+    public string? ParentId { get; init; }
+    public required string Description { get; init; }
+    public required IReadOnlyList<string> Files { get; init; }
+    public string? AssignedAgent { get; init; }
+}
+
+public record SpawnResult
+{
+    public required string TaskId { get; init; }
+    public int ProcessId { get; init; }
+    public bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+
+    public static SpawnResult Succeeded(string taskId, int processId) =>
+        new() { TaskId = taskId, ProcessId = processId, Success = true };
+
+    public static SpawnResult Failed(string taskId, string errorMessage) =>
+        new() { TaskId = taskId, ProcessId = 0, Success = false, ErrorMessage = errorMessage };
+}
+
+public record AgentProcessInfo
+{
+    public int ProcessId { get; init; }
+    public required string AgentRole { get; init; }
+    public DateTime StartedAt { get; init; }
+    public AgentProcessStatus Status { get; init; }
+    public int? ExitCode { get; init; }
+}
+
+public enum AgentProcessStatus
+{
+    Running,
+    Exited,
+    Terminated,
+    Unknown
+}
+
+public record EscalationNotification
+{
+    public required string AgentRole { get; init; }
+    public int FailureCount { get; init; }
+    public string? LastError { get; init; }
+    public Checkpoint? Checkpoint { get; init; }
+    public IReadOnlyList<string> Artifacts { get; init; } = [];
+    public string? Context { get; init; }
+
+    public static EscalationNotification FromAgentState(
+        AgentState agent,
+        Checkpoint? checkpoint,
+        string? additionalContext = null);
+}
+```
+
 ---
 
-## MCP Tools Specification
+## Configuration Reference
 
-### Tool: apmas_heartbeat
+### Root Configuration (ApmasOptions)
 
-Agents call this periodically to signal they're alive.
+```json
+{
+  "Apmas": {
+    "ProjectName": "my-project",
+    "WorkingDirectory": "C:/projects/my-project",
+    "DataDirectory": ".apmas",
+    "Timeouts": { ... },
+    "Agents": { ... },
+    "Spawner": { ... },
+    "HttpTransport": { ... },
+    "Decomposition": { ... },
+    "Notifications": { ... },
+    "Metrics": { ... }
+  }
+}
+```
+
+### TimeoutOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| DefaultMinutes | int | 30 | Default agent timeout |
+| HeartbeatIntervalMinutes | int | 5 | Expected heartbeat frequency |
+| HeartbeatTimeoutMinutes | int | 10 | Max time without heartbeat |
+| MaxRetries | int | 3 | Max retry attempts before escalation |
+| PollingIntervalSeconds | int | 30 | Supervisor polling frequency |
+| AgentOverrides | Dictionary | {} | Per-agent timeout overrides |
+
+```json
+"Timeouts": {
+  "DefaultMinutes": 30,
+  "HeartbeatIntervalMinutes": 5,
+  "HeartbeatTimeoutMinutes": 10,
+  "MaxRetries": 3,
+  "PollingIntervalSeconds": 30,
+  "AgentOverrides": {
+    "architect": 15,
+    "developer": 45,
+    "reviewer": 20
+  }
+}
+```
+
+### AgentOptions
+
+```json
+"Agents": {
+  "Roster": [
+    {
+      "Role": "architect",
+      "SubagentType": "systems-architect",
+      "Dependencies": [],
+      "Description": "Designs system architecture",
+      "PromptType": "ArchitectPrompt"
+    },
+    {
+      "Role": "designer",
+      "SubagentType": "design-specialist",
+      "Dependencies": [],
+      "PromptType": "DesignerPrompt"
+    },
+    {
+      "Role": "developer",
+      "SubagentType": "html-prototyper",
+      "Dependencies": ["architect", "designer"],
+      "PromptType": "DeveloperPrompt"
+    },
+    {
+      "Role": "reviewer",
+      "SubagentType": "code-reviewer",
+      "Dependencies": ["developer"],
+      "PromptType": "ReviewerPrompt"
+    }
+  ]
+}
+```
+
+### SpawnerOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| ClaudeCodePath | string | "claude" | Path to claude CLI |
+| Model | string | "sonnet" | Model to use |
+| MaxTurns | int | 100 | Max turns before auto-stop |
+| McpConfigPath | string? | null | MCP config file path |
+| UseHttpTransport | bool | true | Use HTTP instead of stdio |
+| GracefulShutdownTimeoutMs | int | 5000 | Graceful termination timeout |
+| DangerouslySkipPermissions | bool | true | Skip permission checks |
+| OutputFormat | string | "stream-json" | CLI output format |
+| LogAgentOutput | bool | true | Log agent stdout/stderr |
+
+```json
+"Spawner": {
+  "ClaudeCodePath": "claude",
+  "Model": "sonnet",
+  "MaxTurns": 100,
+  "UseHttpTransport": true,
+  "GracefulShutdownTimeoutMs": 5000,
+  "DangerouslySkipPermissions": true,
+  "OutputFormat": "stream-json"
+}
+```
+
+### HttpTransportOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| Enabled | bool | true | Enable HTTP transport |
+| Port | int | 5050 | HTTP server port |
+| Host | string | "localhost" | Bind address |
+| SseKeepAliveSeconds | int | 30 | SSE keep-alive interval |
+| MaxRequestBodySize | long | 10MB | Max request size |
+
+```json
+"HttpTransport": {
+  "Enabled": true,
+  "Port": 5050,
+  "Host": "127.0.0.1",
+  "SseKeepAliveSeconds": 30,
+  "MaxRequestBodySize": 10485760
+}
+```
+
+**Security Note**: Default binds to localhost only. Using "0.0.0.0" exposes the server to the network - use a reverse proxy in production.
+
+### DecompositionOptions
+
+```json
+"Decomposition": {
+  "SafeContextTokens": 50000,
+  "TokensPerFile": 15000
+}
+```
+
+### NotificationOptions
+
+```json
+"Notifications": {
+  "Provider": "Console",
+  "Email": {
+    "SmtpHost": "smtp.example.com",
+    "SmtpPort": 587,
+    "UseSsl": true,
+    "Username": null,
+    "Password": null,
+    "FromAddress": "apmas@example.com",
+    "FromName": "APMAS",
+    "ToAddresses": ["team@example.com"]
+  },
+  "Slack": {
+    "WebhookUrl": "https://hooks.slack.com/services/...",
+    "Channel": "#alerts",
+    "Username": "APMAS",
+    "IconEmoji": ":robot_face:"
+  }
+}
+```
+
+**Provider options**: `Console`, `Email`, `Slack`
+
+**Security Note**: Never store passwords in appsettings.json. Use User Secrets (dev) or Key Vault (prod).
+
+### MetricsOptions
+
+```json
+"Metrics": {
+  "Enabled": true,
+  "OpenTelemetry": {
+    "Enabled": false,
+    "Endpoint": "http://localhost:4317",
+    "Protocol": "grpc"
+  }
+}
+```
+
+---
+
+## Transport Mechanisms
+
+### HTTP/SSE MCP Transport
+
+The primary transport mechanism for spawned agents. Implemented in `HttpMcpServerHost.cs`.
+
+**Protocol**: MCP over HTTP with Server-Sent Events
+- MCP version: "2025-11-25"
+- Server name: "APMAS"
+- Server version: "1.0.0"
+
+**Connection Flow**:
+1. APMAS starts `HttpMcpServerHost` on configured port (default 5050)
+2. Supervisor spawns Claude Code agent with MCP config pointing to HTTP endpoint
+3. Agent sends MCP initialize request via HTTP POST
+4. Server establishes SSE connection for server-to-client streaming
+5. Agent calls tools via HTTP POST to `/tool/{toolName}`
+6. Agent reads resources via HTTP GET to `/resource?uri={uri}`
+7. SSE keep-alive comments sent every 30 seconds
+8. Agent calls `apmas_complete` when done
+9. Connection closed
+
+**Features**:
+- Configurable host and port
+- Request size limits (default 10MB)
+- SSE keep-alive heartbeats
+- Connection state management
+- Graceful shutdown coordination
+
+### Agent Process Management
 
 ```csharp
-public class HeartbeatTool : IMcpTool
+public class ClaudeCodeSpawner : IAgentSpawner
 {
-    public string Name => "apmas_heartbeat";
-    public string Description => "Signal that you are still working. Call every 5 minutes.";
-
-    public JsonSchema InputSchema => new()
+    public async Task<SpawnResult> SpawnAgentAsync(
+        string role,
+        string subagentType,
+        string? checkpointContext = null)
     {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["status"] = new() { Type = "string", Enum = new[] { "working", "thinking", "writing" } },
-            ["progress"] = new() { Type = "string", Description = "Brief description of current work" },
-            ["estimatedContextUsage"] = new() { Type = "integer", Description = "Estimated tokens used (if known)" }
-        },
-        Required = new[] { "status" }
-    };
+        // Build command: claude --model sonnet --max-turns 100 ...
+        // Set environment variables including MCP endpoint
+        // Start process and track in _processes dictionary
+        // Return TaskId and ProcessId
+    }
 
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
+    public async Task ShutdownAllAgentsAsync()
     {
-        var status = input.GetProperty("status").GetString()!;
-        var progress = input.TryGetProperty("progress", out var p) ? p.GetString() : null;
-        var contextUsage = input.TryGetProperty("estimatedContextUsage", out var c) ? c.GetInt32() : (int?)null;
-
-        _heartbeatMonitor.RecordHeartbeat(_currentAgent, status, progress, contextUsage);
-
-        return ToolResult.Success("Heartbeat recorded");
+        // Close stdin (EOF signal)
+        // Wait graceful timeout (default 5s)
+        // Force kill entire process tree if needed
     }
 }
 ```
 
-### Tool: apmas_report_status
+---
 
-Report task status and artifacts.
+## Storage Layer
+
+### IStateStore Interface
 
 ```csharp
-public class ReportStatusTool : IMcpTool
+public interface IStateStore
 {
-    public string Name => "apmas_report_status";
-    public string Description => "Report your current status and any artifacts created.";
+    Task EnsureStorageCreatedAsync();
 
-    public JsonSchema InputSchema => new()
-    {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["status"] = new()
-            {
-                Type = "string",
-                Enum = new[] { "working", "done", "blocked", "needs_review", "context_limit" }
-            },
-            ["message"] = new() { Type = "string", Description = "Status message" },
-            ["artifacts"] = new()
-            {
-                Type = "array",
-                Items = new() { Type = "string" },
-                Description = "List of files created or modified"
-            },
-            ["blockedReason"] = new() { Type = "string", Description = "If blocked, explain why" }
-        },
-        Required = new[] { "status", "message" }
-    };
+    // Project state
+    Task<ProjectState?> GetProjectStateAsync();
+    Task SaveProjectStateAsync(ProjectState state);
 
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var status = input.GetProperty("status").GetString()!;
-        var message = input.GetProperty("message").GetString()!;
-        var artifacts = input.TryGetProperty("artifacts", out var a)
-            ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
-            : new List<string>();
+    // Agent state
+    Task<AgentState?> GetAgentStateAsync(string role);
+    Task<IReadOnlyList<AgentState>> GetAllAgentStatesAsync();
+    Task SaveAgentStateAsync(AgentState state);
 
-        await _messageBus.PublishAsync(new AgentMessage
-        {
-            Id = Guid.NewGuid().ToString(),
-            Timestamp = DateTime.UtcNow,
-            From = _currentAgent,
-            To = "supervisor",
-            Type = MapStatusToMessageType(status),
-            Content = message,
-            Artifacts = artifacts
-        });
+    // Checkpoints
+    Task<Checkpoint?> GetLatestCheckpointAsync(string agentRole);
+    Task<IReadOnlyList<Checkpoint>> GetCheckpointHistoryAsync(string agentRole, int limit = 10);
+    Task SaveCheckpointAsync(Checkpoint checkpoint);
 
-        await _stateManager.UpdateAgentStateAsync(_currentAgent, state => state with
-        {
-            Status = MapStatusToAgentStatus(status),
-            LastMessage = message,
-            Artifacts = state.Artifacts.Concat(artifacts).Distinct().ToList()
-        });
-
-        return ToolResult.Success($"Status '{status}' recorded");
-    }
+    // Messages
+    Task<IReadOnlyList<AgentMessage>> GetMessagesAsync(
+        string? agentRole = null,
+        DateTime? since = null,
+        int? limit = null);
+    Task SaveMessageAsync(AgentMessage message);
 }
 ```
 
-### Tool: apmas_checkpoint
+### SQLite Implementation
 
-Save progress checkpoint for context recovery.
+**Database**: `.apmas/state.db`
+
+**Tables**:
+- `ProjectStates` - Single row for project metadata
+- `AgentStates` - One row per agent
+- `Checkpoints` - Multiple per agent, ordered by creation time
+- `AgentMessages` - All inter-agent communication
+
+**Initialization**:
+- `EnsureStorageCreatedAsync()` creates tables if needed
+- EF Core migrations handle schema updates
+
+---
+
+## Monitoring & Observability
+
+### Structured Logging with Serilog
 
 ```csharp
-public class CheckpointTool : IMcpTool
+builder.Services.AddSerilog((services, config) => config
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "APMAS")
+    .WriteTo.Console(outputTemplate:
+        "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.Seq("http://localhost:5341")
+    .WriteTo.File(
+        path: ".apmas/logs/apmas-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7));
+```
+
+### Metrics Collection
+
+```csharp
+public class ApmasMetrics : IApmasMetrics
 {
-    public string Name => "apmas_checkpoint";
-    public string Description => "Save a checkpoint of your progress. Call when completing subtasks or if approaching context limits.";
+    private readonly Counter<int> _agentsSpawned;
+    private readonly Counter<int> _agentsCompleted;
+    private readonly Counter<int> _agentsFailed;
+    private readonly Counter<int> _agentsTimedOut;
+    private readonly Histogram<double> _agentDuration;
 
-    public JsonSchema InputSchema => new()
-    {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["summary"] = new() { Type = "string", Description = "Brief summary of current state" },
-            ["completedItems"] = new() { Type = "array", Items = new() { Type = "string" } },
-            ["pendingItems"] = new() { Type = "array", Items = new() { Type = "string" } },
-            ["activeFiles"] = new() { Type = "array", Items = new() { Type = "string" } },
-            ["notes"] = new() { Type = "string", Description = "Any notes for continuation" }
-        },
-        Required = new[] { "summary", "completedItems", "pendingItems" }
-    };
-
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var checkpoint = new Checkpoint
-        {
-            AgentRole = _currentAgent,
-            CreatedAt = DateTime.UtcNow,
-            Summary = input.GetProperty("summary").GetString()!,
-            CompletedItems = input.GetProperty("completedItems").EnumerateArray()
-                .Select(x => x.GetString()!).ToList(),
-            PendingItems = input.GetProperty("pendingItems").EnumerateArray()
-                .Select(x => x.GetString()!).ToList(),
-            ActiveFiles = input.TryGetProperty("activeFiles", out var af)
-                ? af.EnumerateArray().Select(x => x.GetString()!).ToList()
-                : Array.Empty<string>(),
-            Notes = input.TryGetProperty("notes", out var n) ? n.GetString() : null,
-            Progress = new CheckpointProgress
-            {
-                CompletedTasks = input.GetProperty("completedItems").GetArrayLength(),
-                TotalTasks = input.GetProperty("completedItems").GetArrayLength() +
-                            input.GetProperty("pendingItems").GetArrayLength()
-            }
-        };
-
-        await _checkpointService.SaveCheckpointAsync(_currentAgent, checkpoint);
-
-        return ToolResult.Success($"Checkpoint saved: {checkpoint.Progress.PercentComplete:F0}% complete");
-    }
+    public void RecordAgentSpawned(string role);
+    public void RecordAgentCompleted(string role, TimeSpan duration);
+    public void RecordAgentFailed(string role, string reason);
+    public void RecordAgentTimedOut(string role);
 }
 ```
 
-### Tool: apmas_get_context
-
-Get project context and other agents' outputs.
+### Health Check
 
 ```csharp
-public class GetContextTool : IMcpTool
+public class ApmasHealthCheck : IHealthCheck
 {
-    public string Name => "apmas_get_context";
-    public string Description => "Get current project context, other agents' outputs, and messages.";
-
-    public JsonSchema InputSchema => new()
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
     {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["include"] = new()
-            {
-                Type = "array",
-                Items = new() { Type = "string" },
-                Description = "What to include: 'project', 'agents', 'messages', 'artifacts'"
-            },
-            ["agentRoles"] = new()
-            {
-                Type = "array",
-                Items = new() { Type = "string" },
-                Description = "Specific agent roles to get info about"
-            },
-            ["messageLimit"] = new() { Type = "integer", Description = "Max messages to return" }
-        }
-    };
+        var projectState = await _stateManager.GetProjectStateAsync();
+        var unhealthyAgents = await _heartbeatMonitor.GetUnhealthyAgentsAsync();
 
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var include = input.TryGetProperty("include", out var i)
-            ? i.EnumerateArray().Select(x => x.GetString()!).ToHashSet()
-            : new HashSet<string> { "project", "agents", "messages" };
+        if (unhealthyAgents.Any())
+            return HealthCheckResult.Degraded($"Unhealthy agents: {string.Join(", ", unhealthyAgents)}");
 
-        var result = new Dictionary<string, object>();
+        if (projectState?.Phase == ProjectPhase.Failed)
+            return HealthCheckResult.Unhealthy("Project in failed state");
 
-        if (include.Contains("project"))
-        {
-            result["project"] = await _stateManager.GetProjectStateAsync();
-        }
-
-        if (include.Contains("agents"))
-        {
-            var roles = input.TryGetProperty("agentRoles", out var ar)
-                ? ar.EnumerateArray().Select(x => x.GetString()!).ToList()
-                : null;
-
-            result["agents"] = roles != null
-                ? await Task.WhenAll(roles.Select(r => _stateManager.GetAgentStateAsync(r)))
-                : await _stateManager.GetActiveAgentsAsync();
-        }
-
-        if (include.Contains("messages"))
-        {
-            var limit = input.TryGetProperty("messageLimit", out var ml) ? ml.GetInt32() : 50;
-            result["messages"] = await _messageBus.GetAllMessagesAsync(limit);
-        }
-
-        return ToolResult.Success(JsonSerializer.Serialize(result));
-    }
-}
-```
-
-### Tool: apmas_send_message
-
-Send a message to another agent or broadcast.
-
-```csharp
-public class SendMessageTool : IMcpTool
-{
-    public string Name => "apmas_send_message";
-    public string Description => "Send a message to another agent or broadcast to all.";
-
-    public JsonSchema InputSchema => new()
-    {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["to"] = new() { Type = "string", Description = "Target agent role or 'all' for broadcast" },
-            ["type"] = new()
-            {
-                Type = "string",
-                Enum = new[] { "question", "answer", "info", "request" }
-            },
-            ["content"] = new() { Type = "string", Description = "Message content" }
-        },
-        Required = new[] { "to", "type", "content" }
-    };
-
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var message = new AgentMessage
-        {
-            Id = Guid.NewGuid().ToString(),
-            Timestamp = DateTime.UtcNow,
-            From = _currentAgent,
-            To = input.GetProperty("to").GetString()!,
-            Type = Enum.Parse<MessageType>(input.GetProperty("type").GetString()!, ignoreCase: true),
-            Content = input.GetProperty("content").GetString()!
-        };
-
-        await _messageBus.PublishAsync(message);
-
-        return ToolResult.Success($"Message sent to {message.To}");
-    }
-}
-```
-
-### Tool: apmas_request_help
-
-Request human intervention or another agent's assistance.
-
-```csharp
-public class RequestHelpTool : IMcpTool
-{
-    public string Name => "apmas_request_help";
-    public string Description => "Request help when blocked. Can request human intervention or another agent.";
-
-    public JsonSchema InputSchema => new()
-    {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["helpType"] = new()
-            {
-                Type = "string",
-                Enum = new[] { "human", "agent", "clarification" }
-            },
-            ["targetAgent"] = new() { Type = "string", Description = "If requesting agent help, which agent" },
-            ["issue"] = new() { Type = "string", Description = "What you need help with" },
-            ["context"] = new() { Type = "string", Description = "Relevant context" }
-        },
-        Required = new[] { "helpType", "issue" }
-    };
-
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var helpType = input.GetProperty("helpType").GetString()!;
-        var issue = input.GetProperty("issue").GetString()!;
-
-        if (helpType == "human")
-        {
-            await _stateManager.UpdateAgentStateAsync(_currentAgent, s => s with
-            {
-                Status = AgentStatus.Escalated,
-                LastError = issue
-            });
-
-            await _notificationService.SendEscalationAsync(new EscalationNotification
-            {
-                AgentRole = _currentAgent,
-                Issue = issue,
-                Context = input.TryGetProperty("context", out var c) ? c.GetString() : null
-            });
-
-            return ToolResult.Success("Human intervention requested. Pausing work.");
-        }
-
-        // Handle agent-to-agent help request
-        var targetAgent = input.GetProperty("targetAgent").GetString()!;
-
-        await _messageBus.PublishAsync(new AgentMessage
-        {
-            Id = Guid.NewGuid().ToString(),
-            Timestamp = DateTime.UtcNow,
-            From = _currentAgent,
-            To = targetAgent,
-            Type = MessageType.Question,
-            Content = issue
-        });
-
-        return ToolResult.Success($"Help request sent to {targetAgent}");
-    }
-}
-```
-
-### Tool: apmas_complete
-
-Signal task completion.
-
-```csharp
-public class CompleteTool : IMcpTool
-{
-    public string Name => "apmas_complete";
-    public string Description => "Signal that your task is complete. Call when all work is done.";
-
-    public JsonSchema InputSchema => new()
-    {
-        Type = "object",
-        Properties = new Dictionary<string, JsonSchema>
-        {
-            ["summary"] = new() { Type = "string", Description = "Summary of what was accomplished" },
-            ["artifacts"] = new()
-            {
-                Type = "array",
-                Items = new() { Type = "string" },
-                Description = "List of all files created or modified"
-            },
-            ["notes"] = new() { Type = "string", Description = "Any notes for downstream agents" }
-        },
-        Required = new[] { "summary", "artifacts" }
-    };
-
-    public async Task<ToolResult> ExecuteAsync(JsonElement input)
-    {
-        var summary = input.GetProperty("summary").GetString()!;
-        var artifacts = input.GetProperty("artifacts").EnumerateArray()
-            .Select(x => x.GetString()!).ToList();
-
-        await _stateManager.UpdateAgentStateAsync(_currentAgent, s => s with
-        {
-            Status = AgentStatus.Completed,
-            CompletedAt = DateTime.UtcNow,
-            Artifacts = artifacts,
-            LastMessage = summary
-        });
-
-        await _messageBus.PublishAsync(new AgentMessage
-        {
-            Id = Guid.NewGuid().ToString(),
-            Timestamp = DateTime.UtcNow,
-            From = _currentAgent,
-            To = "supervisor",
-            Type = MessageType.Done,
-            Content = summary,
-            Artifacts = artifacts
-        });
-
-        _metrics.RecordAgentCompleted(_currentAgent,
-            DateTime.UtcNow - (await _stateManager.GetAgentStateAsync(_currentAgent)).SpawnedAt!.Value);
-
-        return ToolResult.Success("Task marked complete. You may stop working.");
+        return HealthCheckResult.Healthy("APMAS is running normally");
     }
 }
 ```
@@ -1279,7 +1552,29 @@ public class CompleteTool : IMcpTool
 
 ## Agent Prompts
 
-### Base Agent Prompt Template
+### Prompt Factory
+
+```csharp
+public interface IPromptFactory
+{
+    BaseAgentPrompt CreatePrompt(string promptType);
+}
+
+public class PromptFactory : IPromptFactory
+{
+    public BaseAgentPrompt CreatePrompt(string promptType) => promptType switch
+    {
+        "ArchitectPrompt" => new ArchitectPrompt(),
+        "DesignerPrompt" => new DesignerPrompt(),
+        "DeveloperPrompt" => new DeveloperPrompt(),
+        "ReviewerPrompt" => new ReviewerPrompt(),
+        "TesterPrompt" => new TesterPrompt(),
+        _ => throw new ArgumentException($"Unknown prompt type: {promptType}")
+    };
+}
+```
+
+### Base Agent Prompt
 
 ```csharp
 public abstract class BaseAgentPrompt
@@ -1287,7 +1582,7 @@ public abstract class BaseAgentPrompt
     public abstract string Role { get; }
     public abstract string SubagentType { get; }
 
-    public string Generate(ProjectState project, string? additionalContext = null)
+    public string Generate(ProjectState project, string? recoveryContext = null)
     {
         return $"""
             # {Role} Agent - APMAS Project
@@ -1309,44 +1604,36 @@ public abstract class BaseAgentPrompt
             1. **Heartbeat (every 5 minutes)**
                Call `apmas_heartbeat` while working to signal you're alive.
                ```
-               apmas_heartbeat(status: "working", progress: "building index.html")
+               apmas_heartbeat(agentRole: "{Role.ToLower()}", status: "working", progress: "current task")
                ```
 
             2. **Checkpoint (after each subtask)**
                Call `apmas_checkpoint` to save progress for recovery.
                ```
                apmas_checkpoint(
-                 summary: "Completed homepage layout",
-                 completedItems: ["header", "hero section"],
-                 pendingItems: ["footer", "post grid"]
+                 agentRole: "{Role.ToLower()}",
+                 summary: "Completed X",
+                 completedItems: ["item1", "item2"],
+                 pendingItems: ["item3"]
                )
                ```
 
-            3. **Status Updates**
-               Call `apmas_report_status` for significant updates.
-               ```
-               apmas_report_status(status: "done", message: "Architecture complete", artifacts: ["docs/architecture.md"])
-               ```
-
-            4. **Completion**
+            3. **Completion**
                Call `apmas_complete` when ALL work is done.
                ```
-               apmas_complete(summary: "Built all pages", artifacts: ["src/index.html", "src/post.html"])
+               apmas_complete(
+                 agentRole: "{Role.ToLower()}",
+                 summary: "Summary of work",
+                 artifacts: ["file1.md", "file2.cs"]
+               )
                ```
 
             ### Context Management
 
-            If you feel your responses getting shorter or you're losing context:
-            1. Immediately call `apmas_checkpoint` with your current progress
-            2. Call `apmas_report_status(status: "context_limit", message: "Approaching context limits")`
+            If you feel your context filling up:
+            1. Call `apmas_checkpoint` with your current progress
+            2. Call `apmas_report_status(status: "context_limit", message: "Approaching limits")`
             3. Stop work - the Supervisor will respawn you with your checkpoint
-
-            ### Getting Help
-
-            If blocked, use `apmas_request_help`:
-            ```
-            apmas_request_help(helpType: "clarification", issue: "Design spec unclear on button colors")
-            ```
 
             ## Your Task
             {GetTaskDescription()}
@@ -1354,247 +1641,76 @@ public abstract class BaseAgentPrompt
             ## Deliverables
             {GetDeliverables()}
 
-            ## Dependencies
-            {GetDependencies()}
-
-            {(additionalContext != null ? $"## Additional Context\n{additionalContext}" : "")}
+            {(recoveryContext != null ? $"## Recovery Context\n{recoveryContext}" : "")}
 
             ---
 
-            **BEGIN:** Start your work now. Remember to call `apmas_heartbeat` every 5 minutes.
+            **BEGIN:** Start your work now. Call `apmas_heartbeat` every 5 minutes.
             """;
     }
 
     protected abstract string GetRoleDescription();
     protected abstract string GetTaskDescription();
     protected abstract string GetDeliverables();
-    protected abstract string GetDependencies();
 }
 ```
 
-### Example: Developer Agent Prompt
+### Available Prompts
 
-```csharp
-public class DeveloperPrompt : BaseAgentPrompt
-{
-    public override string Role => "Developer";
-    public override string SubagentType => "html-prototyper"; // or "dotnet-specialist"
-
-    protected override string GetRoleDescription() => """
-        You implement features based on architecture and design specifications.
-        You write clean, maintainable code following best practices.
-        You create files, write tests, and ensure quality.
-        """;
-
-    protected override string GetTaskDescription() => """
-        Implement the required features according to the architecture and design specs.
-        Read the specs first, then build each component methodically.
-        """;
-
-    protected override string GetDeliverables() => """
-        - Source code files in src/
-        - Unit tests (if applicable)
-        - Updated documentation (if needed)
-        """;
-
-    protected override string GetDependencies() => """
-        Wait for these before starting:
-        - docs/architecture.md (from Architect)
-        - docs/design-spec.md (from Designer)
-
-        Use `apmas_get_context` to check if these exist.
-        """;
-}
-```
+| Prompt | Role | SubagentType |
+|--------|------|--------------|
+| ArchitectPrompt | Architect | systems-architect |
+| DesignerPrompt | Designer | design-specialist |
+| DeveloperPrompt | Developer | html-prototyper / dotnet-specialist |
+| ReviewerPrompt | Reviewer | code-reviewer |
+| TesterPrompt | Tester | test-writer |
 
 ---
 
-## Implementation Plan
+## Startup Sequence
 
-### Phase 1: Core Infrastructure (Week 1)
-
-1. **Project Setup**
-   - Create .NET 8 solution with projects
-   - Configure DI, logging, configuration
-   - Set up SQLite for state persistence
-
-2. **Data Models**
-   - Implement all record types
-   - Create EF Core DbContext
-   - Add migrations
-
-3. **State Management**
-   - Implement `AgentStateManager`
-   - Implement `MessageBus`
-   - Add file watching for external changes
-
-### Phase 2: MCP Server (Week 2)
-
-1. **MCP Protocol Implementation**
-   - Implement MCP server base
-   - Add stdio transport
-   - Handle tool calls
-
-2. **Tool Handlers**
-   - Implement all 7 tools
-   - Add validation
-   - Add error handling
-
-3. **Resources**
-   - Implement resource handlers
-   - Add caching
-
-### Phase 3: Supervisor Service (Week 3)
-
-1. **Core Supervisor**
-   - Implement background service
-   - Add polling loop
-   - Add dependency resolution
-
-2. **Agent Spawner**
-   - Implement Claude Code CLI integration
-   - Add process management
-   - Handle stdout/stderr
-
-3. **Timeout Handling**
-   - Implement timeout detection
-   - Add retry logic
-   - Add escalation
-
-### Phase 4: Agent Integration (Week 4)
-
-1. **Agent Prompts**
-   - Create prompt templates
-   - Test with real agents
-   - Iterate on instructions
-
-2. **End-to-End Testing**
-   - Test full workflow
-   - Test failure scenarios
-   - Test recovery
-
-3. **Documentation**
-   - API documentation
-   - Usage guide
-   - Troubleshooting guide
+1. **Bootstrap Logger**: Console and Seq only, before DI setup
+2. **Configuration**: Load from appsettings.json
+3. **DI Registration**: All services, tools, resources
+4. **Database Initialization**: Create tables if needed
+5. **Project Initialization**: Create project and agents from config if not exists
+6. **Dependency Validation**: Check for cycles and missing dependencies
+7. **Start Background Services**:
+   - HttpMcpServerHost (listens for agent connections)
+   - SupervisorService (begins polling loop)
+8. **Running**: Process agents, monitor heartbeats, handle timeouts
+9. **Shutdown**: Gracefully terminate all agents
 
 ---
 
-## Configuration File
+## Error Handling
 
-```json
-{
-  "Apmas": {
-    "ProjectName": "my-project",
-    "WorkingDirectory": "C:/projects/my-project",
-    "DataDirectory": ".apmas",
-    "Timeouts": {
-      "DefaultMinutes": 30,
-      "HeartbeatIntervalMinutes": 5,
-      "HeartbeatTimeoutMinutes": 10,
-      "MaxRetries": 3,
-      "AgentOverrides": {
-        "architect": 15,
-        "developer": 45,
-        "reviewer": 20
-      }
-    },
-    "Agents": {
-      "Roster": [
-        {
-          "Role": "architect",
-          "SubagentType": "systems-architect",
-          "Dependencies": []
-        },
-        {
-          "Role": "designer",
-          "SubagentType": "design-specialist",
-          "Dependencies": []
-        },
-        {
-          "Role": "developer",
-          "SubagentType": "html-prototyper",
-          "Dependencies": ["architect", "designer"]
-        },
-        {
-          "Role": "reviewer",
-          "SubagentType": "code-reviewer",
-          "Dependencies": ["developer"]
-        }
-      ]
-    },
-    "Notifications": {
-      "EscalationEmail": "team@example.com",
-      "SlackWebhook": "https://hooks.slack.com/..."
-    },
-    "Observability": {
-      "SeqUrl": "http://localhost:5341",
-      "EnableMetrics": true
-    }
-  }
-}
-```
+### Tool Error Contract
+
+- Return `ToolResult.Error(message)` for **expected errors** (validation, missing data)
+- **Throw exceptions** for **unexpected errors** (bugs)
+- HttpMcpServerHost catches thrown exceptions and returns MCP error response
+
+### Graceful Shutdown
+
+On application stop:
+1. SupervisorService stops polling
+2. ClaudeCodeSpawner.ShutdownAllAgentsAsync() called
+3. Each agent: close stdin, wait timeout, force kill if needed
+4. Database connections closed
 
 ---
 
-## File Structure Summary
+## Security Considerations
 
-```
-Apmas.Server/
-├── Apmas.Server.csproj
-├── Program.cs
-├── appsettings.json
-├── Configuration/
-├── Core/
-│   ├── Services/
-│   ├── Models/
-│   └── Enums/
-├── Mcp/
-│   ├── ApmasMcpServer.cs
-│   ├── Tools/
-│   └── Resources/
-├── Agents/
-│   ├── Prompts/
-│   └── Definitions/
-└── Storage/
-
-Project Directory Structure:
-project/
-├── .apmas/
-│   ├── state.db           # SQLite database
-│   ├── logs/              # Log files
-│   └── checkpoints/       # Agent checkpoints
-├── docs/
-├── src/
-└── tests/
-```
+1. **HTTP Binding**: Default localhost-only
+2. **Request Size**: Limited to 10MB by default
+3. **Agent Permissions**: `DangerouslySkipPermissions = true` by default
+4. **Secrets**: Use User Secrets (dev) or Key Vault (prod) for passwords
+5. **Agent Isolation**: Each agent runs as separate process
 
 ---
 
-## Success Metrics
-
-| Metric | Target |
-|--------|--------|
-| Agent success rate | > 95% |
-| Average timeout recovery | < 2 retries |
-| Human escalations | < 5% of tasks |
-| Context limit recoveries | 100% successful |
-| End-to-end project completion | > 90% |
-
----
-
-## Appendix: MCP Protocol Reference
-
-The MCP server implements the Model Context Protocol specification:
-
-- **Transport**: stdio (for Claude Code integration)
-- **Capabilities**: tools, resources
-- **Tools**: 7 custom tools for agent coordination
-- **Resources**: Project state, messages, checkpoints
-
-For MCP protocol details, see: https://modelcontextprotocol.io/
-
----
-
-*Document Version: 1.0*
-*Last Updated: 2026-01-20*
+*Document Version: 2.0*
+*Last Updated: 2026-01-22*
+*Based on implementation commit: 0e5d5a4*
