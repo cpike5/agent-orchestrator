@@ -41,4 +41,10 @@ public class SpawnerOptions
     /// Output format for Claude Code CLI.
     /// </summary>
     public string OutputFormat { get; set; } = "stream-json";
+
+    /// <summary>
+    /// Whether to use HTTP transport (connecting to running APMAS) instead of stdio (spawning new APMAS).
+    /// When true, spawned agents will connect to the HTTP endpoint instead of spawning their own server.
+    /// </summary>
+    public bool UseHttpTransport { get; set; } = true;
 }

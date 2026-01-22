@@ -22,7 +22,7 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
     private readonly SpawnerOptions _spawnerOptions;
     private readonly IPromptFactory _promptFactory;
     private readonly IAgentStateManager _stateManager;
-    private readonly ConcurrentDictionary<string, ManagedProcess> _processes = new();
+    private readonly ConcurrentDictionary<string, ManagedProcess> _processes = new(StringComparer.OrdinalIgnoreCase);
 
     public ClaudeCodeSpawner(
         ILogger<ClaudeCodeSpawner> logger,
@@ -62,6 +62,7 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
 
         var taskId = Guid.NewGuid().ToString("D");
         string? tempPromptFile = null;
+        string? mcpConfigFile = null;
         Process? process = null;
 
         try
@@ -75,21 +76,56 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
             // Create temporary prompt file
             tempPromptFile = await CreatePromptFileAsync(agentRole, subagentType, checkpointContext);
 
-            // Build MCP configuration
-            var mcpConfig = BuildMcpConfig();
+            // Create MCP configuration (as JSON string for inline passing)
+            var (mcpConfigJson, configFile) = await CreateMcpConfigAsync();
+            mcpConfigFile = configFile; // Keep for cleanup
 
-            // Build command line arguments
-            var arguments = BuildCommandLineArguments(taskId, tempPromptFile, mcpConfig, agentRole);
+            // Build command line arguments (use file path - inline JSON escaping is broken on Windows)
+            var arguments = BuildCommandLineArguments(taskId, tempPromptFile, mcpConfigFile, agentRole);
+
+            _logger.LogInformation(
+                "Spawning agent {AgentRole} with command: {Command} {Arguments}",
+                agentRole,
+                _spawnerOptions.ClaudeCodePath,
+                arguments);
 
             // Start the process
+            // For .cmd/.bat files on Windows, run node directly to avoid cmd.exe argument parsing issues
+            var fileName = _spawnerOptions.ClaudeCodePath;
+            var processArguments = arguments;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                (fileName.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
+                 fileName.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Extract the directory from the .cmd path and find the cli.js
+                var npmDir = Path.GetDirectoryName(fileName)!;
+                var cliJsPath = Path.Combine(npmDir, "node_modules", "@anthropic-ai", "claude-code", "cli.js");
+
+                if (File.Exists(cliJsPath))
+                {
+                    // Run node directly with cli.js - avoids all cmd.exe argument parsing issues
+                    fileName = "node";
+                    processArguments = $"\"{cliJsPath}\" {arguments}";
+                    _logger.LogDebug("Running node directly: node {Arguments}", processArguments);
+                }
+                else
+                {
+                    _logger.LogWarning("Could not find cli.js at {Path}, falling back to cmd.exe", cliJsPath);
+                    // Fallback: use cmd /c for batch files
+                    processArguments = $"/c \"{fileName}\" {arguments}";
+                    fileName = "cmd.exe";
+                }
+            }
+
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = _spawnerOptions.ClaudeCodePath,
-                Arguments = arguments,
+                FileName = fileName,
+                Arguments = processArguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                RedirectStandardInput = true,
+                RedirectStandardInput = false,
                 CreateNoWindow = true,
                 WorkingDirectory = _apmasOptions.WorkingDirectory
             };
@@ -133,7 +169,8 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
                     AgentRole = agentRole,
                     TaskId = taskId,
                     StartedAt = DateTime.UtcNow,
-                    TempPromptFile = tempPromptFile
+                    TempPromptFile = tempPromptFile,
+                    TempMcpConfigFile = mcpConfigFile
                 };
 
                 _processes[agentRole] = managedProcess;
@@ -168,7 +205,7 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         {
             _logger.LogError(ex, "Failed to spawn agent {AgentRole}", agentRole);
 
-            // Clean up temp file on failure
+            // Clean up temp prompt file on failure
             if (tempPromptFile != null)
             {
                 try
@@ -178,6 +215,19 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
                 catch (Exception deleteEx)
                 {
                     _logger.LogWarning(deleteEx, "Failed to delete temp prompt file {Path}", tempPromptFile);
+                }
+            }
+
+            // Clean up temp MCP config file on failure
+            if (mcpConfigFile != null && mcpConfigFile.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    File.Delete(mcpConfigFile);
+                }
+                catch (Exception deleteEx)
+                {
+                    _logger.LogWarning(deleteEx, "Failed to delete temp MCP config file {Path}", mcpConfigFile);
                 }
             }
 
@@ -327,8 +377,14 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         return tempFile;
     }
 
-    private string BuildMcpConfig()
+    /// <summary>
+    /// Creates the MCP config and writes it to a temp file, returning the file path.
+    /// Writing to a file is more reliable than inline JSON on Windows command lines.
+    /// </summary>
+    private async Task<(string Json, string FilePath)> CreateMcpConfigAsync()
     {
+        string configJson;
+
         // If an MCP config path is specified, load it
         if (!string.IsNullOrEmpty(_spawnerOptions.McpConfigPath))
         {
@@ -336,33 +392,70 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
                 ? _spawnerOptions.McpConfigPath
                 : Path.Combine(_apmasOptions.WorkingDirectory, _spawnerOptions.McpConfigPath);
 
-            return File.ReadAllText(configPath);
+            // Read the file and return both JSON and path
+            var existingJson = await File.ReadAllTextAsync(configPath);
+            return (existingJson, configPath);
         }
 
-        // Build MCP config dynamically
-        var serverPath = Path.Combine(AppContext.BaseDirectory, "Apmas.Server.dll");
-
-        var config = new
+        // Check if HTTP transport should be used
+        if (_spawnerOptions.UseHttpTransport && _apmasOptions.HttpTransport.Enabled)
         {
-            mcpServers = new
-            {
-                apmas = new
-                {
-                    type = "stdio",
-                    command = "dotnet",
-                    args = new[] { serverPath },
-                    env = new Dictionary<string, string>()
-                }
-            }
-        };
+            _logger.LogInformation(
+                "Using HTTP transport: Host={Host}, Port={Port}, Enabled={Enabled}",
+                _apmasOptions.HttpTransport.Host,
+                _apmasOptions.HttpTransport.Port,
+                _apmasOptions.HttpTransport.Enabled);
 
-        return JsonSerializer.Serialize(config);
+            var config = new
+            {
+                mcpServers = new
+                {
+                    apmas = new
+                    {
+                        type = "sse",
+                        url = $"http://{_apmasOptions.HttpTransport.Host}:{_apmasOptions.HttpTransport.Port}/mcp/sse"
+                    }
+                }
+            };
+            // Use compact JSON (no indentation/newlines) for reliable command-line passing
+            configJson = JsonSerializer.Serialize(config);
+        }
+        else
+        {
+            // Build MCP config dynamically for stdio transport
+            var serverPath = Path.Combine(AppContext.BaseDirectory, "Apmas.Server.dll");
+
+            var stdioConfig = new
+            {
+                mcpServers = new
+                {
+                    apmas = new
+                    {
+                        type = "stdio",
+                        command = "dotnet",
+                        args = new[] { serverPath },
+                        env = new Dictionary<string, string>()
+                    }
+                }
+            };
+            // Use compact JSON (no indentation/newlines) for reliable command-line passing
+            configJson = JsonSerializer.Serialize(stdioConfig);
+        }
+
+        // Write to a temp file with .json extension
+        var tempFile = Path.Combine(Path.GetTempPath(), $"apmas-mcp-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(tempFile, configJson);
+
+        _logger.LogInformation("Created MCP config file {Path} with content: {Content}",
+            tempFile, configJson);
+
+        return (configJson, tempFile);
     }
 
     private string BuildCommandLineArguments(
         string taskId,
         string promptFile,
-        string mcpConfig,
+        string mcpConfigFile,
         string agentRole)
     {
         var args = new StringBuilder();
@@ -382,11 +475,17 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         // Append system prompt file
         args.Append($"--append-system-prompt-file \"{promptFile}\" ");
 
-        // MCP config (inline JSON)
-        var escapedMcpConfig = mcpConfig.Replace("\"", "\\\"");
-        args.Append($"--mcp-config \"{escapedMcpConfig}\" ");
+        // MCP config file path (inline JSON escaping is broken on Windows)
+        args.Append($"--mcp-config \"{mcpConfigFile}\" ");
 
-        // Output format
+        // Note: --strict-mcp-config removed temporarily for debugging
+        // It may interfere with argument parsing on Windows
+
+        // Output format - stream-json requires --verbose when using -p
+        if (_spawnerOptions.OutputFormat == "stream-json")
+        {
+            args.Append("--verbose ");
+        }
         args.Append($"--output-format {_spawnerOptions.OutputFormat} ");
 
         // Max turns
@@ -466,6 +565,24 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
             }
         }
 
+        // Clean up temp MCP config file
+        if (!string.IsNullOrEmpty(managedProcess.TempMcpConfigFile))
+        {
+            try
+            {
+                // Only delete if it's in the temp directory (not a user-provided config path)
+                if (managedProcess.TempMcpConfigFile.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(managedProcess.TempMcpConfigFile);
+                    _logger.LogDebug("Deleted temp MCP config file {Path}", managedProcess.TempMcpConfigFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete temp MCP config file {Path}", managedProcess.TempMcpConfigFile);
+            }
+        }
+
         // Dispose process
         try
         {
@@ -507,5 +624,6 @@ public class ClaudeCodeSpawner : IAgentSpawner, IDisposable
         public required string TaskId { get; init; }
         public required DateTime StartedAt { get; init; }
         public string? TempPromptFile { get; init; }
+        public string? TempMcpConfigFile { get; init; }
     }
 }

@@ -97,7 +97,7 @@ public class AgentStateManager : IAgentStateManager
             throw new ArgumentException("Agent role cannot be null or empty", nameof(agentRole));
         ArgumentNullException.ThrowIfNull(state);
 
-        if (state.Role != agentRole)
+        if (!string.Equals(state.Role, agentRole, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"Agent role mismatch: expected '{agentRole}', but state has '{state.Role}'", nameof(state));
         }
@@ -150,7 +150,7 @@ public class AgentStateManager : IAgentStateManager
         var allAgents = await GetAllAgentsAsync();
 
         // Build a map of agent roles to their completion status
-        var completionMap = allAgents.ToDictionary(a => a.Role, a => a.Status == AgentStatus.Completed);
+        var completionMap = allAgents.ToDictionary(a => a.Role, a => a.Status == AgentStatus.Completed, StringComparer.OrdinalIgnoreCase);
 
         var readyAgents = allAgents
             .Where(a => a.Status == AgentStatus.Pending || a.Status == AgentStatus.Queued)
@@ -226,7 +226,7 @@ public class AgentStateManager : IAgentStateManager
         return true;
     }
 
-    private async Task<IReadOnlyList<AgentState>> GetAllAgentsAsync()
+    public async Task<IReadOnlyList<AgentState>> GetAllAgentsAsync()
     {
         if (_cache.TryGetValue(AllAgentsCacheKey, out IReadOnlyList<AgentState>? cached) && cached != null)
         {
@@ -279,5 +279,5 @@ public class AgentStateManager : IAgentStateManager
         _cache.Remove(AllAgentsCacheKey);
     }
 
-    private static string GetAgentCacheKey(string agentRole) => $"agent-{agentRole}";
+    private static string GetAgentCacheKey(string agentRole) => $"agent-{agentRole.ToLowerInvariant()}";
 }

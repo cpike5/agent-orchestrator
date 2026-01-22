@@ -11,7 +11,7 @@ namespace Apmas.Server.Core.Services;
 /// </summary>
 public class HeartbeatMonitor : IHeartbeatMonitor
 {
-    private readonly ConcurrentDictionary<string, HeartbeatInfo> _heartbeats = new();
+    private readonly ConcurrentDictionary<string, HeartbeatInfo> _heartbeats = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAgentStateManager _agentStateManager;
     private readonly IApmasMetrics _metrics;
     private readonly ILogger<HeartbeatMonitor> _logger;

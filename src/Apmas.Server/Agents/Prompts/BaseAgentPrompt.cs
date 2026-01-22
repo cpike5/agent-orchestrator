@@ -75,10 +75,20 @@ public abstract class BaseAgentPrompt
                )
                ```
 
-            3. **Status Updates**
-               Call `apmas_report_status` for significant updates.
+            3. **Status Updates (CALL FREQUENTLY)**
+               Call `apmas_report_status` whenever you:
+               - Start a new task phase: `status: "working", message: "Starting: implementing header component"`
+               - Complete a piece of work: `status: "working", message: "Completed: header component done"`
+               - Hit any delay or blocker: `status: "blocked", message: "Need clarification", blockedReason: "..."`
+               - Make progress on long work (every few minutes of active coding)
+
+               Example:
                ```
-               apmas_report_status(status: "done", message: "Architecture complete", artifacts: ["docs/architecture.md"])
+               apmas_report_status(status: "working", message: "Starting: database schema design")
+               // ... do work ...
+               apmas_report_status(status: "working", message: "Completed: database schema, moving to API routes")
+               // ... do work ...
+               apmas_report_status(status: "done", message: "All tasks complete", artifacts: ["docs/architecture.md"])
                ```
 
             4. **Completion**

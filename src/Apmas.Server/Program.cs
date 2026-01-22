@@ -9,11 +9,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Application", "APMAS")
     .WriteTo.Console(outputTemplate:
@@ -34,8 +31,6 @@ try
     builder.Services.AddSerilog((services, config) => config
         .ReadFrom.Configuration(builder.Configuration)
         .ReadFrom.Services(services)
-        .MinimumLevel.Information()
-        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Application", "APMAS")
         .WriteTo.Console(outputTemplate:

@@ -62,7 +62,8 @@ public class SqliteStateStore : IStateStore
     public async Task<AgentState?> GetAgentStateAsync(string role)
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.AgentStates.FirstOrDefaultAsync(a => a.Role == role);
+        var normalizedRole = role.ToLowerInvariant();
+        return await context.AgentStates.FirstOrDefaultAsync(a => a.Role.ToLower() == normalizedRole);
     }
 
     public async Task SaveAgentStateAsync(AgentState state)
@@ -71,8 +72,8 @@ public class SqliteStateStore : IStateStore
         try
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-
-            var existing = await context.AgentStates.FirstOrDefaultAsync(a => a.Role == state.Role);
+            var normalizedRole = state.Role.ToLowerInvariant();
+            var existing = await context.AgentStates.FirstOrDefaultAsync(a => a.Role.ToLower() == normalizedRole);
             if (existing != null)
             {
                 existing.Status = state.Status;

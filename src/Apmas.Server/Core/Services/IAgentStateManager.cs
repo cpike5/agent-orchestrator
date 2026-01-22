@@ -38,6 +38,11 @@ public interface IAgentStateManager
     Task<IReadOnlyList<AgentState>> GetActiveAgentsAsync();
 
     /// <summary>
+    /// Gets all agent states regardless of status.
+    /// </summary>
+    Task<IReadOnlyList<AgentState>> GetAllAgentsAsync();
+
+    /// <summary>
     /// Gets all agents that are ready to be spawned (dependencies completed, status is Pending or Queued).
     /// </summary>
     Task<IReadOnlyList<string>> GetReadyAgentsAsync();

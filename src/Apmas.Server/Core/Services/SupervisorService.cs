@@ -1,6 +1,7 @@
 using Apmas.Server.Configuration;
 using Apmas.Server.Core.Enums;
 using Apmas.Server.Core.Models;
+using Apmas.Server.Mcp.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ public class SupervisorService : BackgroundService
     private readonly IMessageBus _messageBus;
     private readonly IHeartbeatMonitor _heartbeatMonitor;
     private readonly ITimeoutHandler _timeoutHandler;
+    private readonly IHttpServerReadySignal _httpServerReadySignal;
     private readonly IApmasMetrics _metrics;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
@@ -27,6 +29,7 @@ public class SupervisorService : BackgroundService
         IMessageBus messageBus,
         IHeartbeatMonitor heartbeatMonitor,
         ITimeoutHandler timeoutHandler,
+        IHttpServerReadySignal httpServerReadySignal,
         IApmasMetrics metrics,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
@@ -36,6 +39,7 @@ public class SupervisorService : BackgroundService
         _messageBus = messageBus;
         _heartbeatMonitor = heartbeatMonitor;
         _timeoutHandler = timeoutHandler;
+        _httpServerReadySignal = httpServerReadySignal;
         _metrics = metrics;
         _logger = logger;
         _options = options.Value;
@@ -45,8 +49,21 @@ public class SupervisorService : BackgroundService
     {
         _logger.LogInformation("SupervisorService started");
 
-        // Wait a short delay on startup to allow initialization
-        await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+        // Wait for HTTP MCP server to be ready before spawning agents
+        // This ensures agents can connect to the HTTP endpoint
+        _logger.LogInformation("Waiting for HTTP MCP server to be ready...");
+        var httpReady = await _httpServerReadySignal.WaitForReadyAsync(
+            TimeSpan.FromSeconds(30),
+            stoppingToken);
+
+        if (!httpReady)
+        {
+            _logger.LogWarning("HTTP MCP server did not become ready within timeout. Agents may fail to connect.");
+        }
+        else
+        {
+            _logger.LogInformation("HTTP MCP server is ready. Proceeding with agent management.");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {

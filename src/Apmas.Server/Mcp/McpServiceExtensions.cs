@@ -1,3 +1,4 @@
+using Apmas.Server.Mcp.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Apmas.Server.Mcp;
@@ -21,8 +22,14 @@ public static class McpServiceExtensions
         // Add memory cache for resource caching
         services.AddMemoryCache();
 
-        // Register MCP server host as a hosted service
+        // Register HTTP server readiness signal (must be before HttpMcpServerHost)
+        services.AddSingleton<IHttpServerReadySignal, HttpServerReadySignal>();
+
+        // Register MCP server host as a hosted service (stdio transport)
         services.AddHostedService<McpServerHost>();
+
+        // Register HTTP/SSE MCP server host as a hosted service
+        services.AddHostedService<HttpMcpServerHost>();
 
         return services;
     }

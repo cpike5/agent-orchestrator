@@ -39,6 +39,11 @@ public class ApmasOptions
     public SpawnerOptions Spawner { get; set; } = new();
 
     /// <summary>
+    /// HTTP transport configuration for spawned agents.
+    /// </summary>
+    public HttpTransportOptions HttpTransport { get; set; } = new();
+
+    /// <summary>
     /// Task decomposition configuration.
     /// </summary>
     public DecompositionOptions Decomposition { get; set; } = new();

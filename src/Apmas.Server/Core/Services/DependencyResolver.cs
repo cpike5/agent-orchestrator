@@ -26,7 +26,7 @@ public class DependencyResolver : IDependencyResolver
 
         // Build dependency map from roster at construction time
         var roster = options.Value.Agents.Roster ?? [];
-        _dependencyMap = roster.ToDictionary(a => a.Role, a => a.Dependencies);
+        _dependencyMap = roster.ToDictionary(a => a.Role, a => a.Dependencies, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc />
@@ -36,7 +36,7 @@ public class DependencyResolver : IDependencyResolver
 
         // Build completion status map
         var completionMap = allAgents
-            .ToDictionary(a => a.Role, a => a.Status == AgentStatus.Completed);
+            .ToDictionary(a => a.Role, a => a.Status == AgentStatus.Completed, StringComparer.OrdinalIgnoreCase);
 
         var readyAgents = allAgents
             .Where(a => a.Status == AgentStatus.Pending)
@@ -125,7 +125,7 @@ public class DependencyResolver : IDependencyResolver
         var errors = new List<string>();
 
         // 0 = white (unvisited), 1 = gray (in progress), 2 = black (done)
-        var color = new Dictionary<string, int>();
+        var color = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var role in _dependencyMap.Keys)
         {
             color[role] = 0;
