@@ -20,6 +20,7 @@ public class SupervisorService : BackgroundService
     private readonly ITimeoutHandler _timeoutHandler;
     private readonly IHttpServerReadySignal _httpServerReadySignal;
     private readonly IApmasMetrics _metrics;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
 
@@ -31,6 +32,7 @@ public class SupervisorService : BackgroundService
         ITimeoutHandler timeoutHandler,
         IHttpServerReadySignal httpServerReadySignal,
         IApmasMetrics metrics,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
     {
@@ -41,6 +43,7 @@ public class SupervisorService : BackgroundService
         _timeoutHandler = timeoutHandler;
         _httpServerReadySignal = httpServerReadySignal;
         _metrics = metrics;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
         _options = options.Value;
     }
@@ -160,6 +163,16 @@ public class SupervisorService : BackgroundService
                     continue;
                 }
 
+                // Publish agent update after Queued→Spawning transition
+                try
+                {
+                    await _dashboardEvents.PublishAgentUpdateAsync(agentState);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+                }
+
                 if (recoveryContext != null)
                 {
                     _logger.LogInformation(
@@ -200,6 +213,17 @@ public class SupervisorService : BackgroundService
 
                     await _metrics.UpdateCachedMetricsAsync();
 
+                    // Publish agent update after spawn failure
+                    var failedAgent = await _stateManager.GetAgentStateAsync(agentState.Role);
+                    try
+                    {
+                        await _dashboardEvents.PublishAgentUpdateAsync(failedAgent);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentState.Role);
+                    }
+
                     continue;
                 }
 
@@ -221,6 +245,17 @@ public class SupervisorService : BackgroundService
                     agentState.Role,
                     spawnResult.TaskId,
                     spawnResult.ProcessId);
+
+                // Publish agent update after successful spawn (Spawning→Running)
+                var runningAgent = await _stateManager.GetAgentStateAsync(agentState.Role);
+                try
+                {
+                    await _dashboardEvents.PublishAgentUpdateAsync(runningAgent);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentState.Role);
+                }
             }
             catch (Exception ex)
             {
@@ -232,6 +267,17 @@ public class SupervisorService : BackgroundService
                     a.LastError = $"Spawn failed: {ex.Message}";
                     return a;
                 });
+
+                // Publish agent update after exception failure
+                var failedAgent = await _stateManager.GetAgentStateAsync(agentRole);
+                try
+                {
+                    await _dashboardEvents.PublishAgentUpdateAsync(failedAgent);
+                }
+                catch (Exception publishEx)
+                {
+                    _logger.LogWarning(publishEx, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+                }
             }
         }
     }
@@ -254,6 +300,17 @@ public class SupervisorService : BackgroundService
                     return a;
                 });
                 _logger.LogInformation("Agent {AgentRole} queued (dependencies met)", agentRole);
+
+                // Publish agent update after Pending→Queued transition
+                var updatedAgent = await _stateManager.GetAgentStateAsync(agentRole);
+                try
+                {
+                    await _dashboardEvents.PublishAgentUpdateAsync(updatedAgent);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+                }
             }
         }
     }

@@ -15,17 +15,20 @@ public class HeartbeatTool : IMcpTool
 {
     private readonly IAgentStateManager _agentStateManager;
     private readonly IHeartbeatMonitor _heartbeatMonitor;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<HeartbeatTool> _logger;
     private readonly ApmasOptions _apmasOptions;
 
     public HeartbeatTool(
         IAgentStateManager agentStateManager,
         IHeartbeatMonitor heartbeatMonitor,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<HeartbeatTool> logger,
         IOptions<ApmasOptions> apmasOptions)
     {
         _agentStateManager = agentStateManager;
         _heartbeatMonitor = heartbeatMonitor;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
         _apmasOptions = apmasOptions.Value;
     }
@@ -134,6 +137,17 @@ public class HeartbeatTool : IMcpTool
             _heartbeatMonitor.RecordHeartbeat(agentRole, status, progress);
 
             _logger.LogInformation("Heartbeat from {AgentRole}: {Status}", agentRole, status);
+
+            // Publish agent update after heartbeat
+            var updatedAgent = await _agentStateManager.GetAgentStateAsync(agentRole);
+            try
+            {
+                await _dashboardEvents.PublishAgentUpdateAsync(updatedAgent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+            }
 
             var newTimeoutAt = DateTime.UtcNow.Add(_apmasOptions.Timeouts.HeartbeatTimeout);
             var message = $"Heartbeat acknowledged for agent '{agentRole}'. Timeout extended to {newTimeoutAt:yyyy-MM-dd HH:mm:ss} UTC.";

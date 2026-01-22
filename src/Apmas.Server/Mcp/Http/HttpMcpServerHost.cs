@@ -24,6 +24,8 @@ public class HttpMcpServerHost : BackgroundService
     private readonly McpToolRegistry _toolRegistry;
     private readonly McpResourceRegistry _resourceRegistry;
     private readonly IAgentStateManager _stateManager;
+    private readonly IMessageBus _messageBus;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly IHttpServerReadySignal _readySignal;
     private readonly ILogger<HttpMcpServerHost> _logger;
     private readonly ConcurrentDictionary<string, SseConnection> _connections = new();
@@ -39,6 +41,8 @@ public class HttpMcpServerHost : BackgroundService
         McpToolRegistry toolRegistry,
         McpResourceRegistry resourceRegistry,
         IAgentStateManager stateManager,
+        IMessageBus messageBus,
+        IDashboardEventPublisher dashboardEvents,
         IHttpServerReadySignal readySignal,
         ILogger<HttpMcpServerHost> logger)
     {
@@ -46,6 +50,8 @@ public class HttpMcpServerHost : BackgroundService
         _toolRegistry = toolRegistry;
         _resourceRegistry = resourceRegistry;
         _stateManager = stateManager;
+        _messageBus = messageBus;
+        _dashboardEvents = dashboardEvents;
         _readySignal = readySignal;
         _logger = logger;
     }
@@ -95,6 +101,11 @@ public class HttpMcpServerHost : BackgroundService
 
             // Status endpoint for quick visibility into agent states
             _app.MapGet("/status", HandleStatusAsync);
+
+            // Dashboard endpoints
+            _app.MapGet("/api/dashboard/state", HandleDashboardStateAsync);
+            _app.MapGet("/dashboard/events", HandleDashboardEventsAsync);
+            _app.MapGet("/dashboard", HandleDashboardPageAsync);
 
             // Start the server (this returns once it's actually listening)
             await _app.StartAsync(stoppingToken);
@@ -854,6 +865,170 @@ public class HttpMcpServerHost : BackgroundService
             _logger.LogError(ex, "Error handling status request");
             context.Response.StatusCode = 500;
             await context.Response.WriteAsJsonAsync(new { error = ex.Message }, context.RequestAborted);
+        }
+    }
+
+    /// <summary>
+    /// Handles the /api/dashboard/state endpoint - returns complete state snapshot for initial dashboard load.
+    /// </summary>
+    private async Task HandleDashboardStateAsync(HttpContext context)
+    {
+        try
+        {
+            var project = await _stateManager.GetProjectStateAsync();
+            var agents = await _stateManager.GetAllAgentsAsync();
+            var recentMessages = await _messageBus.GetAllMessagesAsync(limit: 50);
+
+            var now = DateTime.UtcNow;
+            var elapsedSeconds = project != null ? (int)(now - project.StartedAt).TotalSeconds : 0;
+            var completedAgentCount = agents.Count(a => a.Status == Core.Enums.AgentStatus.Completed);
+            var totalAgentCount = agents.Count;
+
+            var response = new
+            {
+                timestamp = now.ToString("O"),
+                project = project != null ? new
+                {
+                    name = project.Name,
+                    phase = project.Phase.ToString(),
+                    startedAt = project.StartedAt.ToString("O"),
+                    workingDirectory = project.WorkingDirectory,
+                    elapsedSeconds,
+                    completedAgentCount,
+                    totalAgentCount
+                } : null,
+                agents = agents.Select(a =>
+                {
+                    var agentElapsedSeconds = a.SpawnedAt.HasValue
+                        ? (int)((a.CompletedAt ?? now) - a.SpawnedAt.Value).TotalSeconds
+                        : 0;
+
+                    // Parse dependencies from JSON
+                    List<string>? dependencies = null;
+                    if (!string.IsNullOrEmpty(a.DependenciesJson))
+                    {
+                        try
+                        {
+                            dependencies = JsonSerializer.Deserialize<List<string>>(a.DependenciesJson);
+                        }
+                        catch
+                        {
+                            dependencies = null;
+                        }
+                    }
+
+                    return new
+                    {
+                        role = a.Role,
+                        status = a.Status.ToString(),
+                        spawnedAt = a.SpawnedAt?.ToString("O"),
+                        completedAt = a.CompletedAt?.ToString("O"),
+                        elapsedSeconds = agentElapsedSeconds,
+                        lastMessage = a.LastMessage,
+                        retryCount = a.RetryCount,
+                        lastHeartbeat = a.LastHeartbeat?.ToString("O"),
+                        dependencies = dependencies ?? new List<string>()
+                    };
+                }).ToList(),
+                recentMessages = recentMessages.Select(m => new
+                {
+                    id = m.Id,
+                    timestamp = m.Timestamp.ToString("O"),
+                    from = m.From,
+                    to = m.To,
+                    type = m.Type.ToString(),
+                    content = m.Content
+                }).ToList()
+            };
+
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(response, new JsonSerializerOptions { WriteIndented = true }, context.RequestAborted);
+
+            _logger.LogInformation("Dashboard state snapshot served: {AgentCount} agents, {MessageCount} recent messages",
+                agents.Count, recentMessages.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling dashboard state request");
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsJsonAsync(new { error = ex.Message }, context.RequestAborted);
+        }
+    }
+
+    /// <summary>
+    /// Handles the /dashboard/events endpoint - SSE endpoint for real-time dashboard updates.
+    /// </summary>
+    private async Task HandleDashboardEventsAsync(HttpContext context)
+    {
+        _logger.LogInformation("New dashboard events SSE connection established");
+
+        // Set headers for SSE
+        context.Response.ContentType = "text/event-stream";
+        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.Headers.Connection = "keep-alive";
+
+        // Disable response buffering
+        var feature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>();
+        feature?.DisableBuffering();
+
+        try
+        {
+            // Subscribe to dashboard events
+            await foreach (var dashboardEvent in _dashboardEvents.SubscribeAsync(context.RequestAborted))
+            {
+                // Serialize the event data
+                var eventData = JsonSerializer.Serialize(new
+                {
+                    timestamp = dashboardEvent.Timestamp.ToString("O"),
+                    data = dashboardEvent.Data
+                });
+
+                // Write SSE message: event: {type}\ndata: {json}\n\n
+                var message = $"event: {dashboardEvent.Type}\ndata: {eventData}\n\n";
+                var bytes = Encoding.UTF8.GetBytes(message);
+                await context.Response.Body.WriteAsync(bytes, context.RequestAborted);
+                await context.Response.Body.FlushAsync(context.RequestAborted);
+
+                _logger.LogDebug("Sent dashboard event: {EventType}", dashboardEvent.Type);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Dashboard events SSE connection closed");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in dashboard events SSE connection");
+        }
+    }
+
+    /// <summary>
+    /// Handles the /dashboard endpoint - serves the dashboard HTML page.
+    /// </summary>
+    private async Task HandleDashboardPageAsync(HttpContext context)
+    {
+        context.Response.ContentType = "text/html; charset=utf-8";
+
+        // Try to find dashboard.html in wwwroot folder
+        var baseDir = AppContext.BaseDirectory;
+        var dashboardPath = Path.Combine(baseDir, "wwwroot", "dashboard.html");
+
+        // Also check relative to working directory (for development)
+        if (!File.Exists(dashboardPath))
+        {
+            dashboardPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "dashboard.html");
+        }
+
+        if (File.Exists(dashboardPath))
+        {
+            var html = await File.ReadAllTextAsync(dashboardPath, context.RequestAborted);
+            await context.Response.WriteAsync(html, context.RequestAborted);
+        }
+        else
+        {
+            _logger.LogWarning("Dashboard HTML file not found at {Path}", dashboardPath);
+            context.Response.StatusCode = 404;
+            await context.Response.WriteAsync($"Dashboard not found. Expected at: {dashboardPath}", context.RequestAborted);
         }
     }
 

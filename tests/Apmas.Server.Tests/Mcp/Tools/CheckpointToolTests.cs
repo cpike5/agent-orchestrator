@@ -53,7 +53,8 @@ public class CheckpointToolTests : IDisposable
             _cache,
             optionsWrapper,
             roster);
-        _tool = new CheckpointTool(_agentStateManager, _stateStore, NullLogger<CheckpointTool>.Instance);
+        var dashboardPublisher = new FakeDashboardEventPublisher();
+        _tool = new CheckpointTool(_agentStateManager, _stateStore, dashboardPublisher, NullLogger<CheckpointTool>.Instance);
 
         // Ensure database is created
         using var context = _contextFactory.CreateDbContext();
@@ -374,6 +375,19 @@ public class CheckpointToolTests : IDisposable
         public ApmasDbContext CreateDbContext()
         {
             return new ApmasDbContext(_options);
+        }
+    }
+
+    private class FakeDashboardEventPublisher : IDashboardEventPublisher
+    {
+        public Task PublishAgentUpdateAsync(AgentState agentState) => Task.CompletedTask;
+        public Task PublishMessageAsync(AgentMessage message) => Task.CompletedTask;
+        public Task PublishCheckpointAsync(Checkpoint checkpoint) => Task.CompletedTask;
+        public Task PublishProjectUpdateAsync(ProjectState projectState) => Task.CompletedTask;
+        public async IAsyncEnumerable<DashboardEvent> SubscribeAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield break;
         }
     }
 }

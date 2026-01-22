@@ -14,15 +14,18 @@ public class CompleteTool : IMcpTool
 {
     private readonly IAgentStateManager _stateManager;
     private readonly IMessageBus _messageBus;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<CompleteTool> _logger;
 
     public CompleteTool(
         IAgentStateManager stateManager,
         IMessageBus messageBus,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<CompleteTool> logger)
     {
         _stateManager = stateManager;
         _messageBus = messageBus;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
     }
 
@@ -180,6 +183,17 @@ public class CompleteTool : IMcpTool
             };
 
             await _messageBus.PublishAsync(message);
+
+            // Publish agent update after completion
+            var completedAgent = await _stateManager.GetAgentStateAsync(agentRole);
+            try
+            {
+                await _dashboardEvents.PublishAgentUpdateAsync(completedAgent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+            }
 
             // Log completion with duration if available
             if (duration.HasValue)

@@ -61,11 +61,13 @@ public class TimeoutHandlerTests : IDisposable
             optionsWrapper,
             roster);
         _messageBus = new FakeMessageBus();
+        var dashboardPublisher = new FakeDashboardEventPublisher();
 
         _handler = new TimeoutHandler(
             _agentStateManager,
             _stateStore,
             _messageBus,
+            dashboardPublisher,
             NullLogger<TimeoutHandler>.Instance,
             optionsWrapper);
 
@@ -417,6 +419,19 @@ public class TimeoutHandlerTests : IDisposable
         }
 
         public async IAsyncEnumerable<AgentMessage> SubscribeAsync(string? agentRole = null, CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private class FakeDashboardEventPublisher : IDashboardEventPublisher
+    {
+        public Task PublishAgentUpdateAsync(AgentState agentState) => Task.CompletedTask;
+        public Task PublishMessageAsync(AgentMessage message) => Task.CompletedTask;
+        public Task PublishCheckpointAsync(Checkpoint checkpoint) => Task.CompletedTask;
+        public Task PublishProjectUpdateAsync(ProjectState projectState) => Task.CompletedTask;
+        public async IAsyncEnumerable<DashboardEvent> SubscribeAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             await Task.CompletedTask;
             yield break;

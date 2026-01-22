@@ -15,15 +15,18 @@ public class CheckpointTool : IMcpTool
 {
     private readonly IAgentStateManager _stateManager;
     private readonly IStateStore _stateStore;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<CheckpointTool> _logger;
 
     public CheckpointTool(
         IAgentStateManager stateManager,
         IStateStore stateStore,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<CheckpointTool> logger)
     {
         _stateManager = stateManager;
         _stateStore = stateStore;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
     }
 
@@ -162,6 +165,16 @@ public class CheckpointTool : IMcpTool
                 "Checkpoint saved for {AgentRole}: {PercentComplete:F1}% complete",
                 agentRole,
                 checkpoint.PercentComplete);
+
+            // Publish checkpoint event
+            try
+            {
+                await _dashboardEvents.PublishCheckpointAsync(checkpoint);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish dashboard event for checkpoint {AgentRole}", agentRole);
+            }
 
             // Return success response
             return ToolResult.Success(

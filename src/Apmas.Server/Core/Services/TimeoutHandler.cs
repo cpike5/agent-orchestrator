@@ -17,6 +17,7 @@ public class TimeoutHandler : ITimeoutHandler
     private readonly IAgentStateManager _stateManager;
     private readonly IStateStore _stateStore;
     private readonly IMessageBus _messageBus;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<TimeoutHandler> _logger;
     private readonly ApmasOptions _options;
 
@@ -24,12 +25,14 @@ public class TimeoutHandler : ITimeoutHandler
         IAgentStateManager stateManager,
         IStateStore stateStore,
         IMessageBus messageBus,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<TimeoutHandler> logger,
         IOptions<ApmasOptions> options)
     {
         _stateManager = stateManager;
         _stateStore = stateStore;
         _messageBus = messageBus;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
         _options = options.Value;
     }
@@ -111,6 +114,17 @@ public class TimeoutHandler : ITimeoutHandler
             "Agent {AgentRole} queued for restart (attempt {RetryCount})",
             agent.Role,
             agent.RetryCount + 1);
+
+        // Publish agent update after restart with checkpoint
+        var updatedAgent = await _stateManager.GetAgentStateAsync(agent.Role);
+        try
+        {
+            await _dashboardEvents.PublishAgentUpdateAsync(updatedAgent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agent.Role);
+        }
     }
 
     /// <summary>
@@ -151,6 +165,17 @@ public class TimeoutHandler : ITimeoutHandler
             "Agent {AgentRole} queued for restart with reduced scope (attempt {RetryCount})",
             agent.Role,
             agent.RetryCount + 1);
+
+        // Publish agent update after restart with reduced scope
+        var updatedAgent = await _stateManager.GetAgentStateAsync(agent.Role);
+        try
+        {
+            await _dashboardEvents.PublishAgentUpdateAsync(updatedAgent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agent.Role);
+        }
     }
 
     /// <summary>
@@ -194,6 +219,17 @@ public class TimeoutHandler : ITimeoutHandler
         _logger.LogWarning(
             "Escalation notification sent for agent {AgentRole}",
             agent.Role);
+
+        // Publish agent update after escalation
+        var escalatedAgent = await _stateManager.GetAgentStateAsync(agent.Role);
+        try
+        {
+            await _dashboardEvents.PublishAgentUpdateAsync(escalatedAgent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agent.Role);
+        }
     }
 
     /// <summary>

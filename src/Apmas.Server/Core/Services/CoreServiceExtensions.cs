@@ -27,6 +27,12 @@ public static class CoreServiceExtensions
         services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
         services.AddSingleton<IApmasMetrics, ApmasMetrics>();
+
+        // Register DashboardEventService as singleton and expose both interfaces
+        services.AddSingleton<DashboardEventService>();
+        services.AddSingleton<IDashboardEventPublisher>(sp => sp.GetRequiredService<DashboardEventService>());
+        services.AddHostedService(sp => sp.GetRequiredService<DashboardEventService>());
+
         services.AddNotificationServices();
         services.AddApmasHealthChecks();
         services.AddHostedService<SupervisorService>();

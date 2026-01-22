@@ -14,15 +14,18 @@ public class ReportStatusTool : IMcpTool
 {
     private readonly IAgentStateManager _stateManager;
     private readonly IMessageBus _messageBus;
+    private readonly IDashboardEventPublisher _dashboardEvents;
     private readonly ILogger<ReportStatusTool> _logger;
 
     public ReportStatusTool(
         IAgentStateManager stateManager,
         IMessageBus messageBus,
+        IDashboardEventPublisher dashboardEvents,
         ILogger<ReportStatusTool> logger)
     {
         _stateManager = stateManager;
         _messageBus = messageBus;
+        _dashboardEvents = dashboardEvents;
         _logger = logger;
     }
 
@@ -199,6 +202,17 @@ public class ReportStatusTool : IMcpTool
             await _messageBus.PublishAsync(busMessage);
 
             _logger.LogDebug("Status update and message published for agent {AgentRole}", agentRole);
+
+            // Publish agent update after status change
+            var updatedAgent = await _stateManager.GetAgentStateAsync(agentRole);
+            try
+            {
+                await _dashboardEvents.PublishAgentUpdateAsync(updatedAgent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish dashboard event for agent {AgentRole}", agentRole);
+            }
 
             return ToolResult.Success($"Status updated to '{statusString}'. Message delivered to supervisor.");
         }
