@@ -41,6 +41,10 @@ public class DeveloperPrompt : BaseAgentPrompt
             5. Ensure proper error handling and logging
             6. Write code that is testable and maintainable
             7. Follow security best practices (OWASP guidelines)
+            8. **Before completing, VERIFY the build:**
+               - Run `dotnet build` and confirm it succeeds with no errors
+               - Fix any compilation errors before marking complete
+               - **Do NOT call apmas_complete if the build fails**
             """;
     }
 

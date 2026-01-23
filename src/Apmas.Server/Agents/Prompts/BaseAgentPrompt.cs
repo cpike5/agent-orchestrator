@@ -100,8 +100,15 @@ public abstract class BaseAgentPrompt
                apmas_report_status(status: "done", message: "All tasks complete", artifacts: ["docs/architecture.md"])
                ```
 
-            4. **Completion**
-               Call `apmas_complete` when ALL work is done.
+            4. **Before Completing - VERIFY YOUR WORK**
+               Before calling `apmas_complete`, you MUST verify your work:
+               - Ensure all deliverables exist and are valid
+               - Run any relevant verification commands (build, lint, format check, etc.)
+               - Review your changes for obvious errors
+               - **Do NOT mark complete if there are errors or verification fails**
+
+            5. **Completion**
+               Call `apmas_complete` ONLY after verification passes.
                ```
                apmas_complete(summary: "Built all pages", artifacts: ["src/index.html", "src/post.html"])
                ```
