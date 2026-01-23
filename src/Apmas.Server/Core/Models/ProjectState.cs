@@ -36,4 +36,9 @@ public class ProjectState
     /// When the project completed (if applicable).
     /// </summary>
     public DateTime? CompletedAt { get; set; }
+
+    /// <summary>
+    /// Content loaded from PROJECT-BRIEF.md (or configured brief file).
+    /// </summary>
+    public string? ProjectBrief { get; set; }
 }

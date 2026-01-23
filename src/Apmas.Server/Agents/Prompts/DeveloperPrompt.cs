@@ -34,12 +34,13 @@ public class DeveloperPrompt : BaseAgentPrompt
         return """
             Implement the specified features following architecture and design specifications.
 
-            1. Review architecture document for component structure
-            2. Review design specifications for UI requirements
-            3. Implement features following established patterns
-            4. Ensure proper error handling and logging
-            5. Write code that is testable and maintainable
-            6. Follow security best practices (OWASP guidelines)
+            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            2. Review architecture document for component structure
+            3. Review design specifications for UI requirements
+            4. Implement features following established patterns
+            5. Ensure proper error handling and logging
+            6. Write code that is testable and maintainable
+            7. Follow security best practices (OWASP guidelines)
             """;
     }
 

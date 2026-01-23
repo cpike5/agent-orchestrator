@@ -35,13 +35,14 @@ public class HtmlPrototyperPrompt : BaseAgentPrompt
         return """
             Create working HTML prototypes based on the architecture and design specifications.
 
-            1. Review architecture documents for component structure
-            2. Review design specs for visual requirements and tokens
-            3. Create HTML structure with semantic markup
-            4. Apply CSS styling following design tokens (colors, typography, spacing)
-            5. Add JavaScript for interactivity and dynamic behavior
-            6. Ensure responsive design works across screen sizes
-            7. Test all interactive elements function correctly
+            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            2. Review architecture documents for component structure
+            3. Review design specs for visual requirements and tokens
+            4. Create HTML structure with semantic markup
+            5. Apply CSS styling following design tokens (colors, typography, spacing)
+            6. Add JavaScript for interactivity and dynamic behavior
+            7. Ensure responsive design works across screen sizes
+            8. Test all interactive elements function correctly
             """;
     }
 

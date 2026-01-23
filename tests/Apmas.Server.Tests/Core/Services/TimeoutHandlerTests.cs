@@ -54,12 +54,14 @@ public class TimeoutHandlerTests : IDisposable
         var agentOptionsWrapper = Options.Create(_apmasOptions.Agents);
         var roster = new AgentRoster(agentOptionsWrapper);
 
+        var briefLoader = new FakeBriefLoader();
         _agentStateManager = new AgentStateManager(
             _stateStore,
             NullLogger<AgentStateManager>.Instance,
             _cache,
             optionsWrapper,
-            roster);
+            roster,
+            briefLoader);
         _messageBus = new FakeMessageBus();
         var dashboardPublisher = new FakeDashboardEventPublisher();
 
@@ -436,5 +438,11 @@ public class TimeoutHandlerTests : IDisposable
             await Task.CompletedTask;
             yield break;
         }
+    }
+
+    private class FakeBriefLoader : IProjectBriefLoader
+    {
+        public Task<string?> LoadBriefAsync(string workingDirectory, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
     }
 }

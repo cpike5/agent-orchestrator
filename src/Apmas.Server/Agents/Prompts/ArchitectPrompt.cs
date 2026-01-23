@@ -34,12 +34,13 @@ public class ArchitectPrompt : BaseAgentPrompt
         return """
             Analyze the project requirements and create a comprehensive architecture design.
 
-            1. Review existing codebase structure (if any)
-            2. Define component boundaries and responsibilities
-            3. Specify interfaces between components
-            4. Document technology choices with rationale
-            5. Create architecture decision records for key decisions
-            6. Identify cross-cutting concerns (logging, auth, error handling)
+            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            2. Review existing codebase structure (if any)
+            3. Define component boundaries and responsibilities
+            4. Specify interfaces between components
+            5. Document technology choices with rationale
+            6. Create architecture decision records for key decisions
+            7. Identify cross-cutting concerns (logging, auth, error handling)
             """;
     }
 

@@ -53,12 +53,14 @@ public class HeartbeatToolTests : IDisposable
         var agentOptionsWrapper = Options.Create(apmasOptionsValue.Agents);
         var roster = new AgentRoster(agentOptionsWrapper);
 
+        var briefLoader = new FakeBriefLoader();
         _agentStateManager = new AgentStateManager(
             _stateStore,
             NullLogger<AgentStateManager>.Instance,
             _cache,
             apmasOptions,
-            roster);
+            roster,
+            briefLoader);
         _heartbeatMonitor = new FakeHeartbeatMonitor();
         var dashboardPublisher = new FakeDashboardEventPublisher();
 
@@ -406,5 +408,11 @@ public class HeartbeatToolTests : IDisposable
             await Task.CompletedTask;
             yield break;
         }
+    }
+
+    private class FakeBriefLoader : IProjectBriefLoader
+    {
+        public Task<string?> LoadBriefAsync(string workingDirectory, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
     }
 }

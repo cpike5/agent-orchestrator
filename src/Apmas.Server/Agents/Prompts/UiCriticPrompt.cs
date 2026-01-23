@@ -35,13 +35,14 @@ public class UiCriticPrompt : BaseAgentPrompt
         return """
             Review the implemented UI and provide quality feedback.
 
-            1. Review design spec to understand expected standards
-            2. Examine all implemented UI files (HTML, CSS, JS)
-            3. Evaluate visual hierarchy and layout consistency
-            4. Check alignment, spacing, and typography
-            5. Verify color usage matches design tokens
-            6. Assess responsive behavior at different breakpoints
-            7. Document issues with severity ratings and recommendations
+            1. **Read PROJECT-BRIEF.md** to understand project requirements and goals
+            2. Review design spec to understand expected standards
+            3. Examine all implemented UI files (HTML, CSS, JS)
+            4. Evaluate visual hierarchy and layout consistency
+            5. Check alignment, spacing, and typography
+            6. Verify color usage matches design tokens
+            7. Assess responsive behavior at different breakpoints
+            8. Document issues with severity ratings and recommendations
             """;
     }
 

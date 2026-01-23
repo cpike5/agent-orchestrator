@@ -48,12 +48,14 @@ public class GetContextToolTests : IDisposable
         var agentOptionsWrapper = Options.Create(apmasOptions.Agents);
         var roster = new AgentRoster(agentOptionsWrapper);
 
+        var briefLoader = new FakeBriefLoader();
         _stateManager = new AgentStateManager(
             _stateStore,
             NullLogger<AgentStateManager>.Instance,
             cache,
             optionsWrapper,
-            roster);
+            roster,
+            briefLoader);
         var fakeMetrics = new FakeApmasMetrics();
         _messageBus = new MessageBus(_stateStore, fakeMetrics, NullLogger<MessageBus>.Instance);
 
@@ -434,5 +436,11 @@ public class GetContextToolTests : IDisposable
         public void RecordHeartbeatInterval(double intervalSeconds) { }
         public Task UpdateCachedMetricsAsync() => Task.CompletedTask;
         public void Dispose() { }
+    }
+
+    private class FakeBriefLoader : IProjectBriefLoader
+    {
+        public Task<string?> LoadBriefAsync(string workingDirectory, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
     }
 }

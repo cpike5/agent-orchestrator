@@ -59,6 +59,11 @@ public class ApmasOptions
     public MetricsOptions Metrics { get; set; } = new();
 
     /// <summary>
+    /// Project brief configuration.
+    /// </summary>
+    public ProjectBriefOptions ProjectBrief { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>

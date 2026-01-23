@@ -34,12 +34,13 @@ public class ReviewerPrompt : BaseAgentPrompt
         return """
             Review the implemented code and provide quality feedback.
 
-            1. Review architecture document to understand expected patterns
-            2. Examine implemented code in `src/` directory
-            3. Check for adherence to architecture and design specs
-            4. Identify code smells, bugs, and security vulnerabilities
-            5. Evaluate error handling and edge cases
-            6. Provide specific, actionable feedback with file:line references
+            1. **Read PROJECT-BRIEF.md** to understand project requirements and goals
+            2. Review architecture document to understand expected patterns
+            3. Examine implemented code in `src/` directory
+            4. Check for adherence to architecture and design specs
+            5. Identify code smells, bugs, and security vulnerabilities
+            6. Evaluate error handling and edge cases
+            7. Provide specific, actionable feedback with file:line references
             """;
     }
 

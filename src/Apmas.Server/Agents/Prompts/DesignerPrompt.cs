@@ -34,12 +34,13 @@ public class DesignerPrompt : BaseAgentPrompt
         return """
             Create the design system and UI specifications for the project.
 
-            1. Review architecture documents for component understanding
-            2. Define design tokens (colors, typography, spacing)
-            3. Create component specifications with visual requirements
-            4. Document interaction patterns and states
-            5. Ensure WCAG accessibility guidelines are addressed
-            6. Provide style guide documentation
+            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            2. Review architecture documents for component understanding
+            3. Define design tokens (colors, typography, spacing)
+            4. Create component specifications with visual requirements
+            5. Document interaction patterns and states
+            6. Ensure WCAG accessibility guidelines are addressed
+            7. Provide style guide documentation
             """;
     }
 

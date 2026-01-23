@@ -19,6 +19,13 @@ public static class CoreServiceExtensions
     public static IServiceCollection AddCoreServices(this IServiceCollection services)
     {
         services.AddMemoryCache();
+
+        // Project brief options and loader
+        services.AddOptions<ProjectBriefOptions>()
+            .BindConfiguration("Apmas:ProjectBrief")
+            .ValidateDataAnnotations();
+        services.AddSingleton<IProjectBriefLoader, ProjectBriefLoader>();
+
         services.AddSingleton<IAgentStateManager, AgentStateManager>();
         services.AddSingleton<IDependencyResolver, DependencyResolver>();
         services.AddSingleton<IMessageBus, MessageBus>();

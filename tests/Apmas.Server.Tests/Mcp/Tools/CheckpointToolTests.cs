@@ -47,12 +47,14 @@ public class CheckpointToolTests : IDisposable
         var agentOptionsWrapper = Options.Create(apmasOptions.Agents);
         var roster = new AgentRoster(agentOptionsWrapper);
 
+        var briefLoader = new FakeBriefLoader();
         _agentStateManager = new AgentStateManager(
             _stateStore,
             NullLogger<AgentStateManager>.Instance,
             _cache,
             optionsWrapper,
-            roster);
+            roster,
+            briefLoader);
         var dashboardPublisher = new FakeDashboardEventPublisher();
         _tool = new CheckpointTool(_agentStateManager, _stateStore, dashboardPublisher, NullLogger<CheckpointTool>.Instance);
 
@@ -389,5 +391,11 @@ public class CheckpointToolTests : IDisposable
             await Task.CompletedTask;
             yield break;
         }
+    }
+
+    private class FakeBriefLoader : IProjectBriefLoader
+    {
+        public Task<string?> LoadBriefAsync(string workingDirectory, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
     }
 }

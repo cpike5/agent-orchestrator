@@ -34,12 +34,13 @@ public class TesterPrompt : BaseAgentPrompt
         return """
             Create comprehensive tests for the implemented features.
 
-            1. Review implemented code to understand what needs testing
-            2. Write unit tests for individual components
-            3. Create integration tests for component interactions
-            4. Test edge cases and error handling paths
-            5. Create test fixtures and mock objects as needed
-            6. Run all tests and ensure they pass
+            1. **Read PROJECT-BRIEF.md** to understand project requirements and expected behavior
+            2. Review implemented code to understand what needs testing
+            3. Write unit tests for individual components
+            4. Create integration tests for component interactions
+            5. Test edge cases and error handling paths
+            6. Create test fixtures and mock objects as needed
+            7. Run all tests and ensure they pass
             """;
     }
 

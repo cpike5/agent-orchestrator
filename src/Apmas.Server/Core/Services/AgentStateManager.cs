@@ -20,6 +20,7 @@ public class AgentStateManager : IAgentStateManager
     private readonly IMemoryCache _cache;
     private readonly ApmasOptions _options;
     private readonly AgentRoster _roster;
+    private readonly IProjectBriefLoader _briefLoader;
 
     private const string ProjectStateCacheKey = "project-state";
     private const string AllAgentsCacheKey = "all-agents";
@@ -30,13 +31,15 @@ public class AgentStateManager : IAgentStateManager
         ILogger<AgentStateManager> logger,
         IMemoryCache cache,
         IOptions<ApmasOptions> options,
-        AgentRoster roster)
+        AgentRoster roster,
+        IProjectBriefLoader briefLoader)
     {
         _stateStore = stateStore;
         _logger = logger;
         _cache = cache;
         _options = options.Value;
         _roster = roster;
+        _briefLoader = briefLoader;
     }
 
     public async Task<ProjectState> GetProjectStateAsync()
@@ -202,6 +205,19 @@ public class AgentStateManager : IAgentStateManager
 
         // Create project state
         await InitializeProjectAsync(_options.ProjectName, _options.WorkingDirectory);
+
+        // Load project brief if available
+        var brief = await _briefLoader.LoadBriefAsync(_options.WorkingDirectory);
+        if (!string.IsNullOrEmpty(brief))
+        {
+            var state = await _stateStore.GetProjectStateAsync();
+            if (state != null)
+            {
+                state.ProjectBrief = brief;
+                await _stateStore.SaveProjectStateAsync(state);
+                _logger.LogInformation("Loaded project brief ({Length} chars)", brief.Length);
+            }
+        }
 
         // Create agent states from roster
         foreach (var agentDef in _roster.Agents)

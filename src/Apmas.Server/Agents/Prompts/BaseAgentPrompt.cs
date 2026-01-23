@@ -42,6 +42,14 @@ public abstract class BaseAgentPrompt
             {additionalContext}
             """;
 
+        var projectBriefSection = string.IsNullOrWhiteSpace(project.ProjectBrief)
+            ? string.Empty
+            : $"""
+
+            ## Project Brief
+            {project.ProjectBrief}
+            """;
+
         return $"""
             # {Role} Agent - APMAS Project
 
@@ -52,6 +60,7 @@ public abstract class BaseAgentPrompt
 
             ## Working Directory
             {project.WorkingDirectory}
+            {projectBriefSection}
 
             ## APMAS Communication
 
