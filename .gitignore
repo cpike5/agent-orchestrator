@@ -416,3 +416,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+temp/apmas-automation-report.md
+temp/discord-dashboard.html
+temp/generate-palette.ps1
