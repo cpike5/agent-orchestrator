@@ -7,6 +7,7 @@ using Apmas.Server.Core.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -89,6 +90,28 @@ public class HttpMcpServerHost : BackgroundService
             // Configure to listen on the specified URL
             _app.Urls.Clear();
             _app.Urls.Add(url);
+
+            // Enable static file serving for dashboard assets (CSS, JS)
+            var wwwrootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            if (!Directory.Exists(wwwrootPath))
+            {
+                // Fallback for development - check relative to working directory
+                wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            }
+
+            if (Directory.Exists(wwwrootPath))
+            {
+                _app.UseStaticFiles(new StaticFileOptions
+                {
+                    FileProvider = new PhysicalFileProvider(wwwrootPath),
+                    RequestPath = ""
+                });
+                _logger.LogInformation("Serving static files from {Path}", wwwrootPath);
+            }
+            else
+            {
+                _logger.LogWarning("wwwroot directory not found, static files will not be served");
+            }
 
             // SSE endpoint for server-to-client streaming
             _app.MapGet("/mcp/sse", HandleSseConnection);
