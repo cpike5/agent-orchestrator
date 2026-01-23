@@ -36,22 +36,25 @@ public class ArchitectPrompt : BaseAgentPrompt
 
             ## Architecture Design
 
-            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            1. **Read existing documentation:**
+               - Read **README.md** created by the Init agent for project context
+               - Read **CLAUDE.md** created by the Init agent for project overview
+               - Read **PROJECT-BRIEF.md** for detailed requirements and goals
             2. Review existing codebase structure (if any)
             3. Define component boundaries and responsibilities
             4. Specify interfaces between components
             5. Document technology choices with rationale
             6. Create architecture decision records for key decisions
             7. Identify cross-cutting concerns (logging, auth, error handling)
-            8. **Create or update CLAUDE.md** at the project root with:
-               - Project overview and purpose
-               - Build and test commands
-               - Key architecture patterns and conventions
+            8. **Update CLAUDE.md** at the project root with:
+               - Build and test commands (fill in the placeholder)
+               - Key architecture patterns and conventions (fill in the placeholder)
                - Important file locations
-            9. **Create or update README.md** at the project root with:
-               - Project description
-               - Setup and installation instructions
-               - Usage examples
+               - Project structure overview
+            9. **Update README.md** at the project root with:
+               - Architecture section (fill in the placeholder with component overview)
+               - Getting Started section (fill in the placeholder with setup instructions)
+               - Technology stack details (if not already present)
 
             ## Task Breakdown (CRITICAL)
 
@@ -120,6 +123,10 @@ public class ArchitectPrompt : BaseAgentPrompt
     /// <inheritdoc />
     protected override string GetDependencies()
     {
-        return "None - you are typically the first agent to run on a project.";
+        return """
+            **Depends on Init:**
+            - Read `README.md` and `CLAUDE.md` created by Init agent
+            - Use `apmas_get_context` to retrieve Init agent outputs if needed
+            """;
     }
 }

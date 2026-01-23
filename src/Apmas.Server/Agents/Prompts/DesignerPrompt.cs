@@ -34,7 +34,10 @@ public class DesignerPrompt : BaseAgentPrompt
         return """
             Create the design system and UI specifications for the project.
 
-            1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
+            1. **Read existing documentation:**
+               - Read **README.md** created by the Init agent for project context
+               - Read **CLAUDE.md** created by the Init agent for project overview
+               - Read **PROJECT-BRIEF.md** for detailed requirements and goals
             2. Review architecture documents for component understanding
             3. Define design tokens (colors, typography, spacing)
             4. Create component specifications with visual requirements
@@ -59,9 +62,10 @@ public class DesignerPrompt : BaseAgentPrompt
     protected override string GetDependencies()
     {
         return """
-            **Depends on Architect:**
+            **Depends on Init and Architect:**
+            - Read `README.md` and `CLAUDE.md` created by Init agent for project context
             - Read `docs/architecture.md` for component structure
-            - Use `apmas_get_context` to retrieve architect outputs
+            - Use `apmas_get_context` to retrieve Init and Architect outputs
             """;
     }
 }

@@ -47,6 +47,7 @@ public static class AgentServiceExtensions
     public static IServiceCollection AddAgentPrompts(this IServiceCollection services)
     {
         // Register all prompt classes as BaseAgentPrompt for collection injection
+        services.AddSingleton<BaseAgentPrompt, InitPrompt>();
         services.AddSingleton<BaseAgentPrompt, ArchitectPrompt>();
         services.AddSingleton<BaseAgentPrompt, DesignerPrompt>();
         services.AddSingleton<BaseAgentPrompt, DeveloperPrompt>();
