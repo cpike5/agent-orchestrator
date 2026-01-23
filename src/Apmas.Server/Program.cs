@@ -73,6 +73,7 @@ try
     builder.Services.AddMcpTool<ReportStatusTool>();
     builder.Services.AddMcpTool<RequestHelpTool>();
     builder.Services.AddMcpTool<SendMessageTool>();
+    builder.Services.AddMcpTool<SubmitTasksTool>();
 
     // MCP resources
     builder.Services.AddMcpResource<ProjectStateResource>();

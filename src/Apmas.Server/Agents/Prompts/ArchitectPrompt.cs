@@ -34,6 +34,8 @@ public class ArchitectPrompt : BaseAgentPrompt
         return """
             Analyze the project requirements and create a comprehensive architecture design.
 
+            ## Architecture Design
+
             1. **Read PROJECT-BRIEF.md** in the working directory for project requirements and goals
             2. Review existing codebase structure (if any)
             3. Define component boundaries and responsibilities
@@ -50,6 +52,54 @@ public class ArchitectPrompt : BaseAgentPrompt
                - Project description
                - Setup and installation instructions
                - Usage examples
+
+            ## Task Breakdown (CRITICAL)
+
+            After completing the architecture, you MUST create a task breakdown:
+
+            10. **Decompose implementation into atomic tasks** - break the work into small, focused tasks
+            11. Each task should:
+                - Be completable in 15-30 minutes
+                - Modify 1-5 files maximum
+                - Have a clear, verifiable outcome
+                - Include specific file paths to create/modify
+            12. Order tasks by dependency (foundational tasks first, then build on them)
+            13. Group related tasks into phases for review checkpoints (e.g., "models", "api", "ui")
+            14. **Submit tasks using `apmas_submit_tasks` tool** with:
+                - Unique taskId for each task (e.g., "task-001", "task-002")
+                - Clear title summarizing the task
+                - Detailed description with specific instructions
+                - List of files to create or modify
+                - Phase name for grouping
+
+            ### Example Task Breakdown
+            ```
+            apmas_submit_tasks({
+              agentRole: "architect",
+              tasks: [
+                {
+                  taskId: "task-001",
+                  title: "Create domain models",
+                  description: "Create the core domain entities: User, Product, Order...",
+                  files: ["src/Models/User.cs", "src/Models/Product.cs"],
+                  phase: "models"
+                },
+                {
+                  taskId: "task-002",
+                  title: "Add DbContext and configuration",
+                  description: "Create the EF Core DbContext with entity configurations...",
+                  files: ["src/Data/AppDbContext.cs"],
+                  phase: "models"
+                }
+              ]
+            })
+            ```
+
+            ### Task Guidelines
+            - First task should set up project structure/scaffolding
+            - Each phase should end with an integration verification task
+            - Don't combine unrelated work in a single task
+            - Be specific about what files to create vs modify
             """;
     }
 
@@ -63,6 +113,7 @@ public class ArchitectPrompt : BaseAgentPrompt
             - Component diagrams (as mermaid in markdown)
             - Interface specifications
             - Technology decision rationale
+            - **Task breakdown submitted via `apmas_submit_tasks` tool**
             """;
     }
 

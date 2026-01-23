@@ -33,6 +33,7 @@ public static class CoreServiceExtensions
         services.AddSingleton<ITimeoutHandler, TimeoutHandler>();
         services.AddSingleton<IContextCheckpointService, ContextCheckpointService>();
         services.AddSingleton<ITaskDecomposerService, TaskDecomposerService>();
+        services.AddSingleton<ITaskQueueService, TaskQueueService>();
         services.AddSingleton<IApmasMetrics, ApmasMetrics>();
 
         // Register DashboardEventService as singleton and expose both interfaces

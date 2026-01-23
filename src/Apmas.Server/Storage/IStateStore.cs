@@ -61,4 +61,34 @@ public interface IStateStore
     /// Saves a message.
     /// </summary>
     Task SaveMessageAsync(AgentMessage message);
+
+    /// <summary>
+    /// Gets a task by its unique task ID.
+    /// </summary>
+    Task<TaskItem?> GetTaskAsync(string taskId);
+
+    /// <summary>
+    /// Saves a task (insert or update).
+    /// </summary>
+    Task SaveTaskAsync(TaskItem task);
+
+    /// <summary>
+    /// Gets all tasks with the specified status.
+    /// </summary>
+    Task<IReadOnlyList<TaskItem>> GetTasksByStatusAsync(Core.Enums.TaskStatus status);
+
+    /// <summary>
+    /// Gets the next pending task in sequence order.
+    /// </summary>
+    Task<TaskItem?> GetNextPendingTaskAsync();
+
+    /// <summary>
+    /// Gets all tasks ordered by sequence number.
+    /// </summary>
+    Task<IReadOnlyList<TaskItem>> GetAllTasksAsync();
+
+    /// <summary>
+    /// Checks if all tasks in a phase are completed.
+    /// </summary>
+    Task<bool> AreAllTasksInPhaseCompletedAsync(string phase);
 }

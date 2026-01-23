@@ -64,6 +64,11 @@ public class ApmasOptions
     public ProjectBriefOptions ProjectBrief { get; set; } = new();
 
     /// <summary>
+    /// Task-based orchestration settings.
+    /// </summary>
+    public TaskOrchestrationOptions TaskOrchestration { get; set; } = new();
+
+    /// <summary>
     /// Gets the full path to the data directory.
     /// </summary>
     public string GetDataDirectoryPath() =>

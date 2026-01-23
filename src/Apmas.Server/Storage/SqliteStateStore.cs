@@ -195,4 +195,86 @@ public class SqliteStateStore : IStateStore
             _lock.Release();
         }
     }
+
+    public async Task<TaskItem?> GetTaskAsync(string taskId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
+    }
+
+    public async Task SaveTaskAsync(TaskItem task)
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existing = await context.Tasks.FirstOrDefaultAsync(t => t.TaskId == task.TaskId);
+            if (existing != null)
+            {
+                existing.SequenceNumber = task.SequenceNumber;
+                existing.FilesJson = task.FilesJson;
+                existing.Phase = task.Phase;
+                existing.Status = task.Status;
+                existing.AssignedAgentRole = task.AssignedAgentRole;
+                existing.StartedAt = task.StartedAt;
+                existing.CompletedAt = task.CompletedAt;
+                existing.ResultSummary = task.ResultSummary;
+                existing.ArtifactsJson = task.ArtifactsJson;
+                existing.ErrorMessage = task.ErrorMessage;
+                existing.RetryCount = task.RetryCount;
+            }
+            else
+            {
+                context.Tasks.Add(task);
+            }
+
+            await context.SaveChangesAsync();
+            _logger.LogDebug("Saved task {TaskId}", task.TaskId);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<TaskItem>> GetTasksByStatusAsync(Core.Enums.TaskStatus status)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Tasks
+            .Where(t => t.Status == status)
+            .OrderBy(t => t.SequenceNumber)
+            .ToListAsync();
+    }
+
+    public async Task<TaskItem?> GetNextPendingTaskAsync()
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Tasks
+            .Where(t => t.Status == Core.Enums.TaskStatus.Pending)
+            .OrderBy(t => t.SequenceNumber)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<IReadOnlyList<TaskItem>> GetAllTasksAsync()
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Tasks
+            .OrderBy(t => t.SequenceNumber)
+            .ToListAsync();
+    }
+
+    public async Task<bool> AreAllTasksInPhaseCompletedAsync(string phase)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var tasksInPhase = await context.Tasks
+            .Where(t => t.Phase == phase)
+            .ToListAsync();
+
+        if (tasksInPhase.Count == 0)
+        {
+            return false;
+        }
+
+        return tasksInPhase.All(t => t.Status == Core.Enums.TaskStatus.Completed);
+    }
 }

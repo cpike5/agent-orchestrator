@@ -17,6 +17,7 @@ public class ApmasDbContext : DbContext
     public DbSet<AgentState> AgentStates => Set<AgentState>();
     public DbSet<AgentMessage> Messages => Set<AgentMessage>();
     public DbSet<Checkpoint> Checkpoints => Set<Checkpoint>();
+    public DbSet<TaskItem> Tasks => Set<TaskItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +54,16 @@ public class ApmasDbContext : DbContext
             entity.Property(e => e.Summary).IsRequired();
             entity.HasIndex(e => new { e.AgentRole, e.CreatedAt });
             entity.Ignore(e => e.PercentComplete);
+        });
+
+        modelBuilder.Entity<TaskItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TaskId).IsRequired();
+            entity.HasIndex(e => e.TaskId).IsUnique();
+            entity.HasIndex(e => e.SequenceNumber);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Phase);
         });
     }
 }

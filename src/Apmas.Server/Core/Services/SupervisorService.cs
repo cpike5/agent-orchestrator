@@ -21,8 +21,10 @@ public class SupervisorService : BackgroundService
     private readonly IHttpServerReadySignal _httpServerReadySignal;
     private readonly IApmasMetrics _metrics;
     private readonly IDashboardEventPublisher _dashboardEvents;
+    private readonly ITaskQueueService _taskQueue;
     private readonly ILogger<SupervisorService> _logger;
     private readonly ApmasOptions _options;
+    private readonly TaskOrchestrationOptions _taskOptions;
 
     public SupervisorService(
         IAgentStateManager stateManager,
@@ -33,6 +35,7 @@ public class SupervisorService : BackgroundService
         IHttpServerReadySignal httpServerReadySignal,
         IApmasMetrics metrics,
         IDashboardEventPublisher dashboardEvents,
+        ITaskQueueService taskQueue,
         ILogger<SupervisorService> logger,
         IOptions<ApmasOptions> options)
     {
@@ -44,8 +47,10 @@ public class SupervisorService : BackgroundService
         _httpServerReadySignal = httpServerReadySignal;
         _metrics = metrics;
         _dashboardEvents = dashboardEvents;
+        _taskQueue = taskQueue;
         _logger = logger;
         _options = options.Value;
+        _taskOptions = options.Value.TaskOrchestration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,7 +79,15 @@ public class SupervisorService : BackgroundService
             {
                 await CheckAgentHealthAsync(stoppingToken);
                 await CheckDependenciesAsync(stoppingToken);
-                await ProcessQueuedAgentsAsync(stoppingToken);
+
+                if (_taskOptions.Enabled)
+                {
+                    await ProcessTaskQueueAsync(stoppingToken);
+                }
+                else
+                {
+                    await ProcessQueuedAgentsAsync(stoppingToken);
+                }
 
                 // Polling interval from configuration
                 await Task.Delay(TimeSpan.FromSeconds(_options.Timeouts.PollingIntervalSeconds), stoppingToken);
@@ -313,5 +326,140 @@ public class SupervisorService : BackgroundService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Processes the task queue when task-based orchestration is enabled.
+    /// </summary>
+    private async Task ProcessTaskQueueAsync(CancellationToken ct)
+    {
+        // 1. First, check if architect has completed (and submitted tasks)
+        var architect = await _stateManager.GetAgentStateAsync("architect");
+        if (architect == null || architect.Status != AgentStatus.Completed)
+        {
+            // Still waiting on architect - use normal agent processing for now
+            await ProcessQueuedAgentsAsync(ct);
+            return;
+        }
+
+        // 2. Check if we have a task in progress
+        var currentTask = await _taskQueue.GetCurrentTaskAsync();
+        if (currentTask != null)
+        {
+            // Check if the agent assigned to this task has completed
+            var taskAgent = await _stateManager.GetAgentStateAsync(currentTask.AssignedAgentRole!);
+            if (taskAgent == null)
+            {
+                // Agent doesn't exist yet - this shouldn't happen
+                _logger.LogWarning("Task {TaskId} has assigned agent {Agent} but agent state not found",
+                    currentTask.TaskId, currentTask.AssignedAgentRole);
+                return;
+            }
+
+            if (taskAgent.Status == AgentStatus.Completed)
+            {
+                _logger.LogInformation("Task {TaskId} completed by {Agent}", currentTask.TaskId, taskAgent.Role);
+                await _taskQueue.UpdateTaskStatusAsync(currentTask.TaskId, Enums.TaskStatus.Completed, taskAgent.LastMessage);
+
+                // Publish dashboard event
+                await _dashboardEvents.PublishAgentUpdateAsync(taskAgent);
+            }
+            else if (taskAgent.Status == AgentStatus.Failed || taskAgent.Status == AgentStatus.Escalated)
+            {
+                _logger.LogWarning("Task {TaskId} failed: {Error}", currentTask.TaskId, taskAgent.LastError);
+                await _taskQueue.UpdateTaskStatusAsync(currentTask.TaskId, Enums.TaskStatus.Failed, error: taskAgent.LastError);
+                // TODO: Implement retry logic or escalation
+                return;
+            }
+            else
+            {
+                // Task still in progress
+                return;
+            }
+        }
+
+        // 3. Check if all tasks are complete
+        if (await _taskQueue.AreAllTasksCompleteAsync())
+        {
+            _logger.LogInformation("All tasks completed - triggering final review");
+            // Transition to review phase if needed
+            // For now, just spawn the reviewer using normal dependency resolution
+            await ProcessQueuedAgentsAsync(ct);
+            return;
+        }
+
+        // 4. Dequeue next task
+        var nextTask = await _taskQueue.DequeueNextTaskAsync();
+        if (nextTask == null)
+        {
+            // No pending tasks - might be waiting for something
+            return;
+        }
+
+        // 5. Spawn a developer for this task
+        await SpawnTaskDeveloperAsync(nextTask, ct);
+    }
+
+    /// <summary>
+    /// Spawns a developer agent for a specific task.
+    /// </summary>
+    private async Task SpawnTaskDeveloperAsync(TaskItem task, CancellationToken ct)
+    {
+        var agentRole = $"Developer-{task.TaskId}";
+        task.AssignedAgentRole = agentRole;
+        await _taskQueue.UpdateTaskStatusAsync(task.TaskId, Enums.TaskStatus.InProgress);
+
+        // Build task context for the developer
+        var taskContext = BuildTaskContext(task);
+
+        // Create agent state for this task-developer
+        var agentState = new AgentState
+        {
+            Role = agentRole,
+            SubagentType = _taskOptions.DeveloperSubagentType,
+            Status = AgentStatus.Queued,
+            DependenciesJson = "[]",  // No agent dependencies - task controls ordering
+            RecoveryContext = taskContext
+        };
+
+        await _stateManager.UpdateAgentStateAsync(agentRole, agentState);
+
+        _logger.LogInformation("Spawning developer {Role} for task {TaskId}: {Title}",
+            agentRole, task.TaskId, task.Title);
+
+        // The queued agent will be picked up by ProcessQueuedAgentsAsync
+        // Call it immediately to avoid waiting for next cycle
+        await ProcessQueuedAgentsAsync(ct);
+    }
+
+    /// <summary>
+    /// Builds the context string to pass to a task developer.
+    /// </summary>
+    private string BuildTaskContext(TaskItem task)
+    {
+        var files = string.IsNullOrEmpty(task.FilesJson)
+            ? "No specific files specified"
+            : string.Join("\n", System.Text.Json.JsonSerializer.Deserialize<List<string>>(task.FilesJson)!
+                .Select(f => $"- {f}"));
+
+        return $"""
+            ## Your Assigned Task
+
+            **Task ID:** {task.TaskId}
+            **Title:** {task.Title}
+            **Phase:** {task.Phase ?? "N/A"}
+
+            ### Description
+            {task.Description}
+
+            ### Files to Work On
+            {files}
+
+            ### Instructions
+            1. Focus ONLY on this specific task
+            2. Do NOT add features beyond what is described
+            3. Verify the build succeeds before completing
+            4. Call `apmas_complete` when done with a summary of changes
+            """;
     }
 }

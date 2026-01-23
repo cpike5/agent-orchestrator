@@ -52,6 +52,7 @@ public static class AgentServiceExtensions
         services.AddSingleton<BaseAgentPrompt, DeveloperPrompt>();
         services.AddSingleton<BaseAgentPrompt, HtmlPrototyperPrompt>();
         services.AddSingleton<BaseAgentPrompt, ReviewerPrompt>();
+        services.AddSingleton<BaseAgentPrompt, TaskDeveloperPrompt>();
         services.AddSingleton<BaseAgentPrompt, TesterPrompt>();
         services.AddSingleton<BaseAgentPrompt, UiCriticPrompt>();
 
