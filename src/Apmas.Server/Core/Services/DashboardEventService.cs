@@ -91,26 +91,27 @@ public class DashboardEventService : IHostedService, IDashboardEventPublisher
     {
         ArgumentNullException.ThrowIfNull(agentState);
 
+        var now = DateTime.UtcNow;
         var dashboardEvent = new DashboardEvent
         {
             Type = DashboardEventTypes.AgentUpdate,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Data = new
             {
-                Role = agentState.Role,
-                Status = agentState.Status.ToString(),
-                SubagentType = agentState.SubagentType,
-                SpawnedAt = agentState.SpawnedAt,
-                CompletedAt = agentState.CompletedAt,
-                TimeoutAt = agentState.TimeoutAt,
-                RetryCount = agentState.RetryCount,
-                LastMessage = agentState.LastMessage,
-                LastError = agentState.LastError,
-                LastHeartbeat = agentState.LastHeartbeat,
-                EstimatedContextUsage = agentState.EstimatedContextUsage,
-                ElapsedTime = agentState.SpawnedAt.HasValue
-                    ? DateTime.UtcNow - agentState.SpawnedAt.Value
-                    : (TimeSpan?)null
+                role = agentState.Role,
+                status = agentState.Status.ToString(),
+                subagentType = agentState.SubagentType,
+                spawnedAt = agentState.SpawnedAt?.ToString("O"),
+                completedAt = agentState.CompletedAt?.ToString("O"),
+                timeoutAt = agentState.TimeoutAt?.ToString("O"),
+                retryCount = agentState.RetryCount,
+                lastMessage = agentState.LastMessage,
+                lastError = agentState.LastError,
+                lastHeartbeat = agentState.LastHeartbeat?.ToString("O"),
+                estimatedContextUsage = agentState.EstimatedContextUsage,
+                elapsedSeconds = agentState.SpawnedAt.HasValue
+                    ? (int)(now - agentState.SpawnedAt.Value).TotalSeconds
+                    : (int?)null
             }
         };
 
@@ -130,14 +131,14 @@ public class DashboardEventService : IHostedService, IDashboardEventPublisher
             Timestamp = message.Timestamp,
             Data = new
             {
-                Id = message.Id,
-                From = message.From,
-                To = message.To,
-                MessageType = message.Type.ToString(),
-                Content = message.Content,
-                Timestamp = message.Timestamp,
-                ArtifactsJson = message.ArtifactsJson,
-                MetadataJson = message.MetadataJson
+                id = message.Id,
+                from = message.From,
+                to = message.To,
+                type = message.Type.ToString(),
+                content = message.Content,
+                timestamp = message.Timestamp.ToString("O"),
+                artifactsJson = message.ArtifactsJson,
+                metadataJson = message.MetadataJson
             }
         };
 
@@ -157,18 +158,18 @@ public class DashboardEventService : IHostedService, IDashboardEventPublisher
             Timestamp = checkpoint.CreatedAt,
             Data = new
             {
-                Id = checkpoint.Id,
-                AgentRole = checkpoint.AgentRole,
-                CreatedAt = checkpoint.CreatedAt,
-                Summary = checkpoint.Summary,
-                CompletedTaskCount = checkpoint.CompletedTaskCount,
-                TotalTaskCount = checkpoint.TotalTaskCount,
-                PercentComplete = checkpoint.PercentComplete,
-                CompletedItemsJson = checkpoint.CompletedItemsJson,
-                PendingItemsJson = checkpoint.PendingItemsJson,
-                ActiveFilesJson = checkpoint.ActiveFilesJson,
-                Notes = checkpoint.Notes,
-                EstimatedContextUsage = checkpoint.EstimatedContextUsage
+                id = checkpoint.Id,
+                agentRole = checkpoint.AgentRole,
+                createdAt = checkpoint.CreatedAt.ToString("O"),
+                summary = checkpoint.Summary,
+                completedTaskCount = checkpoint.CompletedTaskCount,
+                totalTaskCount = checkpoint.TotalTaskCount,
+                percentComplete = checkpoint.PercentComplete,
+                completedItemsJson = checkpoint.CompletedItemsJson,
+                pendingItemsJson = checkpoint.PendingItemsJson,
+                activeFilesJson = checkpoint.ActiveFilesJson,
+                notes = checkpoint.Notes,
+                estimatedContextUsage = checkpoint.EstimatedContextUsage
             }
         };
 
@@ -182,19 +183,20 @@ public class DashboardEventService : IHostedService, IDashboardEventPublisher
     {
         ArgumentNullException.ThrowIfNull(projectState);
 
+        var now = DateTime.UtcNow;
         var dashboardEvent = new DashboardEvent
         {
             Type = DashboardEventTypes.ProjectUpdate,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Data = new
             {
-                Id = projectState.Id,
-                Name = projectState.Name,
-                WorkingDirectory = projectState.WorkingDirectory,
-                Phase = projectState.Phase.ToString(),
-                StartedAt = projectState.StartedAt,
-                CompletedAt = projectState.CompletedAt,
-                ElapsedTime = DateTime.UtcNow - projectState.StartedAt
+                id = projectState.Id,
+                name = projectState.Name,
+                workingDirectory = projectState.WorkingDirectory,
+                phase = projectState.Phase.ToString(),
+                startedAt = projectState.StartedAt.ToString("O"),
+                completedAt = projectState.CompletedAt?.ToString("O"),
+                elapsedSeconds = (int)(now - projectState.StartedAt).TotalSeconds
             }
         };
 
