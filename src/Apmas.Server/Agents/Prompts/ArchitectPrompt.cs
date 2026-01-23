@@ -41,6 +41,15 @@ public class ArchitectPrompt : BaseAgentPrompt
             5. Document technology choices with rationale
             6. Create architecture decision records for key decisions
             7. Identify cross-cutting concerns (logging, auth, error handling)
+            8. **Create or update CLAUDE.md** at the project root with:
+               - Project overview and purpose
+               - Build and test commands
+               - Key architecture patterns and conventions
+               - Important file locations
+            9. **Create or update README.md** at the project root with:
+               - Project description
+               - Setup and installation instructions
+               - Usage examples
             """;
     }
 
@@ -49,6 +58,8 @@ public class ArchitectPrompt : BaseAgentPrompt
     {
         return """
             - `docs/architecture.md` - Main architecture document
+            - `CLAUDE.md` - Project context for Claude Code agents
+            - `README.md` - Project overview and setup instructions
             - Component diagrams (as mermaid in markdown)
             - Interface specifications
             - Technology decision rationale
