@@ -2,7 +2,7 @@ namespace Apmas.Server.Agents.Prompts;
 
 /// <summary>
 /// Prompt template for the Architect agent role.
-/// Focuses on system design, technology decisions, and component structure.
+/// Focuses on system design, technology decisions, and task breakdown.
 /// </summary>
 public class ArchitectPrompt : BaseAgentPrompt
 {
@@ -22,8 +22,8 @@ public class ArchitectPrompt : BaseAgentPrompt
             - Defining system structure and component boundaries
             - Making technology stack decisions
             - Establishing patterns and conventions
-            - Creating architectural diagrams and documentation
-            - Identifying technical risks and mitigation strategies
+            - Creating architectural documentation
+            - Decomposing work into atomic tasks for developers
             - Ensuring scalability, maintainability, and security considerations
             """;
     }
@@ -32,77 +32,77 @@ public class ArchitectPrompt : BaseAgentPrompt
     protected override string GetTaskDescription()
     {
         return """
-            Analyze the project requirements and create a comprehensive architecture design.
+            Create architecture design and decompose implementation into tasks.
 
-            ## Architecture Design
+            ## Step 1: Read Discovery Outputs
 
-            1. **Read existing documentation:**
-               - Read **README.md** created by the Init agent for project context
-               - Read **CLAUDE.md** created by the Init agent for project overview
-               - Read **PROJECT-BRIEF.md** for detailed requirements and goals
-            2. Review existing codebase structure (if any)
-            3. Define component boundaries and responsibilities
-            4. Specify interfaces between components
-            5. Document technology choices with rationale
-            6. Create architecture decision records for key decisions
-            7. Identify cross-cutting concerns (logging, auth, error handling)
-            8. **Update CLAUDE.md** at the project root with:
-               - Build and test commands (fill in the placeholder)
-               - Key architecture patterns and conventions (fill in the placeholder)
-               - Important file locations
-               - Project structure overview
-            9. **Update README.md** at the project root with:
-               - Architecture section (fill in the placeholder with component overview)
-               - Getting Started section (fill in the placeholder with setup instructions)
-               - Technology stack details (if not already present)
+            1. **Read temp/project-context.md** for:
+               - Project type classification
+               - Technology stack identified
+               - Key requirements and constraints
+            2. **Read README.md** for project overview
+            3. **Read CLAUDE.md** for project goals
+            4. **Read PROJECT-BRIEF.md** for detailed requirements
 
-            ## Task Breakdown (CRITICAL)
+            ## Step 2: Architecture Design
 
-            After completing the architecture, you MUST create a task breakdown:
+            5. **Define component boundaries** and responsibilities
+            6. **Specify interfaces** between components
+            7. **Document technology choices** with rationale
+            8. **Identify cross-cutting concerns** (logging, auth, error handling)
 
-            10. **Decompose implementation into atomic tasks** - break the work into small, focused tasks
-            11. Each task should:
+            ## Step 3: Create Architecture Documentation
+
+            9. **Create docs/architecture.md** with:
+               - System overview diagram (mermaid)
+               - Component descriptions and responsibilities
+               - Interface specifications
+               - Technology decisions with rationale
+               - Data flow descriptions
+
+            10. **Update CLAUDE.md** with:
+                - Build and test commands (fill in placeholder)
+                - Architecture patterns and conventions
+                - Important file locations
+                - Project structure overview
+
+            11. **Update README.md** with:
+                - Architecture section (component overview)
+                - Getting Started section (setup instructions)
+
+            ## Step 4: Task Breakdown (CRITICAL)
+
+            12. **Decompose implementation into atomic tasks**
+                Each task should:
                 - Be completable in 15-30 minutes
                 - Modify 1-5 files maximum
                 - Have a clear, verifiable outcome
                 - Include specific file paths to create/modify
-            12. Order tasks by dependency (foundational tasks first, then build on them)
-            13. Group related tasks into phases for review checkpoints (e.g., "models", "api", "ui")
-            14. **Submit tasks using `apmas_submit_tasks` tool** with:
-                - Unique taskId for each task (e.g., "task-001", "task-002")
-                - Clear title summarizing the task
-                - Detailed description with specific instructions
-                - List of files to create or modify
-                - Phase name for grouping
 
-            ### Example Task Breakdown
-            ```
-            apmas_submit_tasks({
-              agentRole: "architect",
-              tasks: [
-                {
-                  taskId: "task-001",
-                  title: "Create domain models",
-                  description: "Create the core domain entities: User, Product, Order...",
-                  files: ["src/Models/User.cs", "src/Models/Product.cs"],
-                  phase: "models"
-                },
-                {
-                  taskId: "task-002",
-                  title: "Add DbContext and configuration",
-                  description: "Create the EF Core DbContext with entity configurations...",
-                  files: ["src/Data/AppDbContext.cs"],
-                  phase: "models"
-                }
-              ]
-            })
-            ```
+            13. **Order tasks by dependency** (foundational tasks first)
+            14. **Group related tasks into phases** (e.g., "models", "api", "ui")
+
+            15. **Submit tasks using `apmas_submit_tasks` tool**:
+                ```
+                apmas_submit_tasks({
+                  agentRole: "architect",
+                  tasks: [
+                    {
+                      taskId: "task-001",
+                      title: "Create domain models",
+                      description: "Create core entities: User, Product...",
+                      files: ["src/Models/User.cs", "src/Models/Product.cs"],
+                      phase: "models"
+                    }
+                  ]
+                })
+                ```
 
             ### Task Guidelines
             - First task should set up project structure/scaffolding
-            - Each phase should end with an integration verification task
+            - Each phase should end with verification task
             - Don't combine unrelated work in a single task
-            - Be specific about what files to create vs modify
+            - Be specific about files to create vs modify
             """;
     }
 
@@ -111,11 +111,8 @@ public class ArchitectPrompt : BaseAgentPrompt
     {
         return """
             - `docs/architecture.md` - Main architecture document
-            - `CLAUDE.md` - Project context for Claude Code agents
-            - `README.md` - Project overview and setup instructions
-            - Component diagrams (as mermaid in markdown)
-            - Interface specifications
-            - Technology decision rationale
+            - Updated `CLAUDE.md` - Build commands, patterns, file locations
+            - Updated `README.md` - Architecture and Getting Started sections
             - **Task breakdown submitted via `apmas_submit_tasks` tool**
             """;
     }
@@ -124,9 +121,10 @@ public class ArchitectPrompt : BaseAgentPrompt
     protected override string GetDependencies()
     {
         return """
-            **Depends on Init:**
-            - Read `README.md` and `CLAUDE.md` created by Init agent
-            - Use `apmas_get_context` to retrieve Init agent outputs if needed
+            **Depends on Discovery:**
+            - Read `temp/project-context.md` for project classification
+            - Read `README.md` and `CLAUDE.md` created by Discovery
+            - Use `apmas_get_context` to retrieve Discovery outputs if needed
             """;
     }
 }
