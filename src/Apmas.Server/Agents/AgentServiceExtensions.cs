@@ -50,8 +50,10 @@ public static class AgentServiceExtensions
         services.AddSingleton<BaseAgentPrompt, ArchitectPrompt>();
         services.AddSingleton<BaseAgentPrompt, DesignerPrompt>();
         services.AddSingleton<BaseAgentPrompt, DeveloperPrompt>();
+        services.AddSingleton<BaseAgentPrompt, HtmlPrototyperPrompt>();
         services.AddSingleton<BaseAgentPrompt, ReviewerPrompt>();
         services.AddSingleton<BaseAgentPrompt, TesterPrompt>();
+        services.AddSingleton<BaseAgentPrompt, UiCriticPrompt>();
 
         // Register the factory
         services.AddSingleton<IPromptFactory, PromptFactory>();
